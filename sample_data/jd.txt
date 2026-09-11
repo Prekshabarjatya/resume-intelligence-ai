@@ -1,0 +1,23 @@
+Backend Engineer — Acme Corp
+
+Acme Corp is hiring a Backend Engineer to help build and scale our core APIs.
+
+Responsibilities:
+- Design, build, and maintain REST APIs used by our web and mobile clients.
+- Write automated tests and participate in code review.
+- Work with PostgreSQL to design efficient data models.
+- Deploy and monitor services in production.
+
+Required qualifications:
+- 2+ years of professional experience with Python.
+- Experience building REST APIs (FastAPI, Flask, or Django).
+- Experience with relational databases (PostgreSQL or similar).
+- Bachelor's degree in Computer Science or a related field, or equivalent experience.
+
+Preferred qualifications:
+- Experience with Docker and containerized deployments.
+- Familiarity with AWS.
+- Experience with CI/CD pipelines.
+
+Employment type: Full-time
+Location: San Francisco, CA (hybrid)
