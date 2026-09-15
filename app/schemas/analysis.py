@@ -2,6 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from app.schemas.base import LLMSchema
 from app.schemas.document import DocumentClassification, ExtractedDocument
 from app.schemas.job import JobProfile
 from app.schemas.resume import ResumeProfile
@@ -61,12 +62,12 @@ class Recommendation(BaseModel):
     priority: str  # "critical" | "high" | "medium" | "low"
 
 
-class GapList(BaseModel):
-    gaps: list[GapItem] = Field(default_factory=list)
+class GapList(LLMSchema):
+    gaps: list[GapItem] | None = Field(default_factory=list)
 
 
-class RecommendationList(BaseModel):
-    recommendations: list[Recommendation] = Field(default_factory=list)
+class RecommendationList(LLMSchema):
+    recommendations: list[Recommendation] | None = Field(default_factory=list)
 
 
 class AnalysisResult(BaseModel):

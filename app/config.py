@@ -5,8 +5,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     groq_api_key: str = ""
-    groq_classifier_model: str = "llama-3.1-8b-instant"
-    groq_reasoning_model: str = "llama-3.3-70b-versatile"
+    groq_classifier_model: str = "openai/gpt-oss-20b"
+    groq_reasoning_model: str = "openai/gpt-oss-120b"
 
     max_optimization_iterations: int = 3
     max_upload_mb: int = 10

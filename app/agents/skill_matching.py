@@ -10,10 +10,11 @@ strictly in the candidate's own stated skill list: it can only point at a
 skill that's actually listed, or say none matches — it can never invent one.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from app.config import settings
 from app.schemas.analysis import MatchType, SkillMatch
+from app.schemas.base import LLMSchema
 from app.schemas.job import SkillRequirement
 from app.tools.llm import get_classifier_llm
 
@@ -33,7 +34,7 @@ matched_resume_skill from the exact strings given in the candidate's skill
 list — never invent a skill."""
 
 
-class SkillMatchJudgment(BaseModel):
+class SkillMatchJudgment(LLMSchema):
     required_skill: str
     matched_resume_skill: str | None
     is_match: bool
@@ -41,8 +42,8 @@ class SkillMatchJudgment(BaseModel):
     reasoning: str
 
 
-class SkillMatchJudgmentList(BaseModel):
-    judgments: list[SkillMatchJudgment] = Field(default_factory=list)
+class SkillMatchJudgmentList(LLMSchema):
+    judgments: list[SkillMatchJudgment] | None = Field(default_factory=list)
 
 
 def judge_semantic_skill_matches(
