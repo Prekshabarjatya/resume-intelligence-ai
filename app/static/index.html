@@ -28,9 +28,17 @@
     line-height: 1.5;
   }
   .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
-  header { margin-bottom: 28px; }
+  header { margin-bottom: 20px; }
   header h1 { font-size: 24px; margin: 0 0 4px; }
   header p { color: var(--text-muted); margin: 0; font-size: 14px; }
+
+  .mode-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .mode-btn {
+    padding: 10px 18px; border: 1px solid var(--border); background: var(--surface);
+    border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text-muted);
+  }
+  .mode-btn.active { background: var(--text); color: white; border-color: var(--text); }
+  .mode-btn:active { transform: scale(0.98); }
 
   .card {
     background: var(--surface);
@@ -135,6 +143,16 @@
   .why-row td { padding: 0 6px 10px; border-bottom: 1px solid var(--border); }
   .why-row .why-text { font-size: 12px; color: var(--text-muted); font-style: italic; padding-left: 2px; }
 
+  .candidate-row { cursor: pointer; }
+  .candidate-row:hover { background: var(--bg); }
+  .candidate-row .rank { color: var(--text-muted); font-weight: 600; }
+  .candidate-detail-row td { padding: 4px 6px 18px; border-bottom: 1px solid var(--border); }
+  .candidate-detail { background: var(--bg); border-radius: 8px; padding: 14px 16px; font-size: 13px; }
+  .candidate-detail h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+  .candidate-detail .mini-gap { padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .candidate-detail .mini-gap:last-child { border-bottom: none; }
+  .candidate-detail .mini-gap .detail { color: var(--text-muted); margin-top: 2px; }
+
   .reasoning-note { font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 6px; padding-left: 152px; }
   @media (max-width: 600px) { .reasoning-note { padding-left: 0; } }
 
@@ -150,31 +168,68 @@
 <div class="wrap">
   <header>
     <h1>Resume Intelligence Platform</h1>
-    <p>Upload a resume and a job description to get an explainable match score, gap analysis, and recommendations.</p>
+    <p id="modeTagline">Upload a resume and a job description to get an explainable match score, gap analysis, and recommendations.</p>
   </header>
 
-  <div class="card">
-    <h2>1. Resume</h2>
-    <label for="resumeFile">Resume file (PDF or DOCX)</label>
-    <input type="file" id="resumeFile" accept=".pdf,.docx" />
+  <div class="mode-tabs">
+    <button type="button" class="mode-btn active" data-mode="candidate">For candidates</button>
+    <button type="button" class="mode-btn" data-mode="hr">For HR: compare candidates</button>
   </div>
 
-  <div class="card">
-    <h2>2. Job Description</h2>
-    <div class="tabs">
-      <button type="button" class="tab-btn active" data-tab="paste">Paste text</button>
-      <button type="button" class="tab-btn" data-tab="upload">Upload file</button>
+  <div id="candidateMode">
+    <div class="card">
+      <h2>1. Resume</h2>
+      <label for="resumeFile">Resume file (PDF or DOCX)</label>
+      <input type="file" id="resumeFile" accept=".pdf,.docx" />
     </div>
-    <div class="tab-pane active" id="tab-paste">
-      <textarea id="jdText" placeholder="Paste the job description here..."></textarea>
+
+    <div class="card">
+      <h2>2. Job Description</h2>
+      <div class="tab-group">
+        <div class="tabs">
+          <button type="button" class="tab-btn active" data-tab="paste">Paste text</button>
+          <button type="button" class="tab-btn" data-tab="upload">Upload file</button>
+        </div>
+        <div class="tab-pane active" data-pane="paste">
+          <textarea id="jdText" placeholder="Paste the job description here..."></textarea>
+        </div>
+        <div class="tab-pane" data-pane="upload">
+          <label for="jdFile">JD file (PDF, DOCX, or TXT)</label>
+          <input type="file" id="jdFile" accept=".pdf,.docx,.txt" />
+        </div>
+      </div>
     </div>
-    <div class="tab-pane" id="tab-upload">
-      <label for="jdFile">JD file (PDF, DOCX, or TXT)</label>
-      <input type="file" id="jdFile" accept=".pdf,.docx,.txt" />
-    </div>
+
+    <button class="btn" id="analyzeBtn" type="button">Analyze fit</button>
   </div>
 
-  <button class="btn" id="analyzeBtn" type="button">Analyze fit</button>
+  <div id="hrMode" style="display:none;">
+    <div class="card">
+      <h2>1. Job Description</h2>
+      <div class="tab-group">
+        <div class="tabs">
+          <button type="button" class="tab-btn active" data-tab="paste">Paste text</button>
+          <button type="button" class="tab-btn" data-tab="upload">Upload file</button>
+        </div>
+        <div class="tab-pane active" data-pane="paste">
+          <textarea id="hrJdText" placeholder="Paste the job description here..."></textarea>
+        </div>
+        <div class="tab-pane" data-pane="upload">
+          <label for="hrJdFile">JD file (PDF, DOCX, or TXT)</label>
+          <input type="file" id="hrJdFile" accept=".pdf,.docx,.txt" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2. Candidate resumes</h2>
+      <label for="hrResumeFiles">Resume files (PDF or DOCX, up to 20 at once)</label>
+      <input type="file" id="hrResumeFiles" accept=".pdf,.docx" multiple />
+    </div>
+
+    <button class="btn" id="compareBtn" type="button">Compare candidates</button>
+  </div>
+
   <div id="status"></div>
 
   <div class="card" id="stepsCard" style="display:none; margin-top: 20px;">
@@ -186,13 +241,34 @@
 </div>
 
 <script>
-const tabButtons = document.querySelectorAll('.tab-btn');
-tabButtons.forEach(btn => {
+const CANDIDATE_TAGLINE = 'Upload a resume and a job description to get an explainable match score, gap analysis, and recommendations.';
+const HR_TAGLINE = 'Upload a job description and multiple resumes to get a ranked, explainable comparison for screening.';
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    tabButtons.forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    const isHr = btn.dataset.mode === 'hr';
+    document.getElementById('candidateMode').style.display = isHr ? 'none' : 'block';
+    document.getElementById('hrMode').style.display = isHr ? 'block' : 'none';
+    document.getElementById('modeTagline').textContent = isHr ? HR_TAGLINE : CANDIDATE_TAGLINE;
+    document.getElementById('resultsWrap').innerHTML = '';
+    document.getElementById('stepsCard').style.display = 'none';
+    document.getElementById('status').textContent = '';
+  });
+});
+
+// Each .tab-group (JD paste-vs-upload toggle) is scoped to itself, since
+// the page now has two independent copies (candidate mode, HR mode).
+document.querySelectorAll('.tab-group').forEach(group => {
+  const buttons = group.querySelectorAll('.tab-btn');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('active'));
+      group.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      group.querySelector(`.tab-pane[data-pane="${btn.dataset.tab}"]`).classList.add('active');
+    });
   });
 });
 
@@ -400,7 +476,7 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
   const resumeFile = document.getElementById('resumeFile').files[0];
   const jdText = document.getElementById('jdText').value.trim();
   const jdFile = document.getElementById('jdFile').files[0];
-  const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+  const activeTab = document.querySelector('#candidateMode .tab-btn.active').dataset.tab;
 
   const status = document.getElementById('status');
   const btn = document.getElementById('analyzeBtn');
@@ -437,6 +513,175 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
       renderBanner('error', `Analysis failed: ${outcome.error}`);
     } else {
       renderResults(outcome.result);
+    }
+  } catch (err) {
+    renderBanner('error', `Request failed: ${err.message}`);
+    status.textContent = '';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function pollBatchJob(jobId) {
+  while (true) {
+    const resp = await fetch(`/hr/batch-analysis/${jobId}`);
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      throw new Error(data.detail || `Polling failed (${resp.status})`);
+    }
+    const data = await resp.json();
+    renderSteps(data.steps);
+
+    if (data.status === 'completed') return { kind: 'completed', result: data.result };
+    if (data.status === 'rejected') return { kind: 'rejected', reason: data.reason };
+    if (data.status === 'failed') return { kind: 'failed', error: data.error };
+
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
+const CANDIDATE_STATUS_LABEL = {
+  scored: 'Scored',
+  rejected_resume: 'Not a resume',
+  failed: 'Error',
+};
+
+function renderCandidateDetail(cand) {
+  const box = el('div', { class: 'candidate-detail' });
+
+  if (cand.status === 'rejected_resume') {
+    box.appendChild(el('div', { text: `Rejected: ${cand.rejection_reason}` }));
+    return box;
+  }
+  if (cand.status === 'failed') {
+    box.appendChild(el('div', { text: `Error: ${cand.error}` }));
+    return box;
+  }
+
+  if (cand.qualitative_match) {
+    box.appendChild(el('h4', { text: 'Fit reasoning' }));
+    box.appendChild(el('div', { class: 'mini-gap', text: `Responsibilities: ${cand.qualitative_match.responsibility_reasoning}` }));
+    box.appendChild(el('div', { class: 'mini-gap', text: `Qualifications: ${cand.qualitative_match.qualification_reasoning}` }));
+  }
+
+  box.appendChild(el('h4', { style: 'margin-top:14px;', text: 'Skill matches' }));
+  cand.skill_matches.forEach(m => {
+    const row = el('div', { class: 'mini-gap' });
+    row.appendChild(el('span', { class: 'badge ' + m.match_type, text: m.match_type }));
+    row.appendChild(el('span', { text: ` ${m.required_skill} -> ${m.matched_resume_skill || '-'}` }));
+    box.appendChild(row);
+  });
+
+  if (cand.gaps.length) {
+    box.appendChild(el('h4', { style: 'margin-top:14px;', text: 'Gaps' }));
+    cand.gaps.forEach(g => {
+      const row = el('div', { class: 'mini-gap' });
+      row.appendChild(el('div', { text: `[${g.category}] ${g.description}` }));
+      row.appendChild(el('div', { class: 'detail', text: g.recommendation }));
+      box.appendChild(row);
+    });
+  }
+
+  return box;
+}
+
+function renderBatchResults(result) {
+  const wrap = document.getElementById('resultsWrap');
+  wrap.innerHTML = '';
+
+  const jdCard = el('div', { class: 'card' });
+  jdCard.appendChild(el('h2', { text: 'Job Description' }));
+  const jdRow = el('div', { class: 'classif-row' });
+  const c = result.jd_classification;
+  jdRow.appendChild(el('span', { class: 'doc-type', text: `${c.document_type} (${Math.round(c.confidence * 100)}% confidence)` }));
+  jdRow.appendChild(el('span', { class: 'reason', text: c.reason }));
+  jdCard.appendChild(jdRow);
+  wrap.appendChild(jdCard);
+
+  const rankCard = el('div', { class: 'card' });
+  rankCard.appendChild(el('h2', { text: `Candidates (${result.candidates.length})` }));
+  const table = el('table');
+  const thead = el('tr');
+  ['#', 'Candidate', 'Overall', 'Skill', 'Experience', 'ATS', 'Status'].forEach(h => thead.appendChild(el('th', { text: h })));
+  table.appendChild(thead);
+
+  result.candidates.forEach((cand, i) => {
+    const tr = el('tr', { class: 'candidate-row' });
+    tr.appendChild(el('td', { class: 'rank', text: String(i + 1) }));
+    const displayName = (cand.resume_profile && cand.resume_profile.personal_info && cand.resume_profile.personal_info.name) || cand.filename;
+    tr.appendChild(el('td', { text: displayName }));
+
+    if (cand.status === 'scored') {
+      tr.appendChild(el('td', { text: Math.round(cand.match_breakdown.overall_score) + '%' }));
+      tr.appendChild(el('td', { text: Math.round(cand.match_breakdown.skill_match) + '%' }));
+      tr.appendChild(el('td', { text: Math.round(cand.match_breakdown.experience_match) + '%' }));
+      tr.appendChild(el('td', { text: Math.round(cand.ats_analysis.score) + '%' }));
+    } else {
+      tr.appendChild(el('td', { text: '-' }));
+      tr.appendChild(el('td', { text: '-' }));
+      tr.appendChild(el('td', { text: '-' }));
+      tr.appendChild(el('td', { text: '-' }));
+    }
+    tr.appendChild(el('td', {}, [
+      el('span', { class: 'badge ' + (cand.status === 'scored' ? 'exact' : 'none'), text: CANDIDATE_STATUS_LABEL[cand.status] }),
+    ]));
+    table.appendChild(tr);
+
+    const detailTr = el('tr', { class: 'candidate-detail-row' });
+    detailTr.hidden = true;
+    const detailTd = el('td', { colspan: '7' });
+    detailTd.appendChild(renderCandidateDetail(cand));
+    detailTr.appendChild(detailTd);
+    table.appendChild(detailTr);
+
+    tr.addEventListener('click', () => { detailTr.hidden = !detailTr.hidden; });
+  });
+
+  rankCard.appendChild(table);
+  wrap.appendChild(rankCard);
+}
+
+document.getElementById('compareBtn').addEventListener('click', async () => {
+  const resumeFiles = document.getElementById('hrResumeFiles').files;
+  const jdText = document.getElementById('hrJdText').value.trim();
+  const jdFile = document.getElementById('hrJdFile').files[0];
+  const activeTab = document.querySelector('#hrMode .tab-btn.active').dataset.tab;
+
+  const status = document.getElementById('status');
+  const btn = document.getElementById('compareBtn');
+
+  if (!resumeFiles.length) { status.textContent = 'Please choose at least one resume file.'; return; }
+  if (activeTab === 'paste' && !jdText) { status.textContent = 'Please paste a job description.'; return; }
+  if (activeTab === 'upload' && !jdFile) { status.textContent = 'Please choose a JD file.'; return; }
+
+  const formData = new FormData();
+  for (const f of resumeFiles) formData.append('resume_files', f);
+  if (activeTab === 'paste') formData.append('jd_text', jdText);
+  else formData.append('jd_file', jdFile);
+
+  btn.disabled = true;
+  status.textContent = 'Starting comparison...';
+  document.getElementById('resultsWrap').innerHTML = '';
+  document.getElementById('stepsCard').style.display = 'none';
+
+  try {
+    const startResp = await fetch('/hr/batch-analysis/start', { method: 'POST', body: formData });
+    const startData = await startResp.json();
+    if (!startResp.ok) {
+      renderBanner('error', `Error: ${startData.detail || startResp.statusText}`);
+      status.textContent = '';
+      return;
+    }
+
+    status.textContent = '';
+    const outcome = await pollBatchJob(startData.job_id);
+
+    if (outcome.kind === 'rejected') {
+      renderBanner('reject', `Rejected: ${outcome.reason}`);
+    } else if (outcome.kind === 'failed') {
+      renderBanner('error', `Comparison failed: ${outcome.error}`);
+    } else {
+      renderBatchResults(outcome.result);
     }
   } catch (err) {
     renderBanner('error', `Request failed: ${err.message}`);

@@ -28,6 +28,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.hr_jobs import create_batch_job, get_batch_job, run_batch_job
 from app.jobs import create_job, get_job, run_job
 from app.pipeline import run_pipeline
 from app.schemas.analysis import PipelineStatus
@@ -68,6 +69,7 @@ async def require_shared_password(request: Request, call_next):
 
 ALLOWED_RESUME_EXTENSIONS = {".pdf", ".docx"}
 ALLOWED_JD_EXTENSIONS = {".pdf", ".docx", ".txt"}
+MAX_BATCH_RESUMES = 20
 
 
 @app.get("/health")
@@ -112,6 +114,52 @@ def _validate_and_save_inputs(
         jd_path = _save_upload(jd_file, jd_ext)
 
     return resume_path, jd_path, jd_text
+
+
+def _validate_and_save_jd(jd_text: str | None, jd_file: UploadFile | None) -> tuple[str | None, str | None]:
+    """Returns (jd_path_or_none, jd_text_or_none). Raises HTTPException on
+    invalid input. Caller owns cleanup of any saved path."""
+    if not settings.groq_api_key:
+        raise HTTPException(status_code=503, detail="GROQ_API_KEY is not configured on the server.")
+
+    if not jd_text and not jd_file:
+        raise HTTPException(status_code=400, detail="Provide either jd_text or jd_file.")
+
+    if jd_file is None:
+        return None, jd_text
+
+    jd_ext = Path(jd_file.filename or "").suffix.lower()
+    if jd_ext not in ALLOWED_JD_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported JD file type '{jd_ext}'. Allowed: {sorted(ALLOWED_JD_EXTENSIONS)}",
+        )
+    return _save_upload(jd_file, jd_ext), jd_text
+
+
+def _validate_and_save_resumes(resume_files: list[UploadFile]) -> list[tuple[str, str]]:
+    """Returns [(display_filename, temp_path), ...]. Raises HTTPException on
+    invalid input. Caller owns cleanup of any saved paths."""
+    if not resume_files:
+        raise HTTPException(status_code=400, detail="Provide at least one resume file.")
+    if len(resume_files) > MAX_BATCH_RESUMES:
+        raise HTTPException(
+            status_code=400, detail=f"At most {MAX_BATCH_RESUMES} resumes per batch (got {len(resume_files)})."
+        )
+
+    saved: list[tuple[str, str]] = []
+    for upload in resume_files:
+        filename = upload.filename or "resume"
+        ext = Path(filename).suffix.lower()
+        if ext not in ALLOWED_RESUME_EXTENSIONS:
+            for _, path in saved:
+                Path(path).unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported resume file type '{ext}' in '{filename}'. Allowed: {sorted(ALLOWED_RESUME_EXTENSIONS)}",
+            )
+        saved.append((filename, _save_upload(upload, ext)))
+    return saved
 
 
 @app.post("/analysis")
@@ -167,6 +215,46 @@ async def start_analysis(
 @app.get("/analysis/{job_id}")
 def get_analysis_status(job_id: str):
     job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="No job with that id (server may have restarted).")
+    return job.to_dict()
+
+
+@app.post("/hr/batch-analysis/start")
+async def start_batch_analysis(
+    resume_files: list[UploadFile] = File(...),
+    jd_text: str | None = Form(default=None),
+    jd_file: UploadFile | None = File(default=None),
+):
+    """HR mode: one JD scored against many resumes, ranked for screening.
+    Distinct from /analysis/start (candidate mode) — see app/hr_pipeline.py
+    for why this isn't just a loop over the candidate pipeline."""
+    jd_path, jd_text = _validate_and_save_jd(jd_text, jd_file)
+    try:
+        resumes = _validate_and_save_resumes(resume_files)
+    except HTTPException:
+        if jd_path:
+            Path(jd_path).unlink(missing_ok=True)
+        raise
+
+    job = create_batch_job([filename for filename, _ in resumes])
+
+    def _run_and_cleanup() -> None:
+        try:
+            run_batch_job(job, jd_path if jd_path is not None else jd_text, resumes, jd_is_file=jd_path is not None)
+        finally:
+            if jd_path:
+                Path(jd_path).unlink(missing_ok=True)
+            for _, path in resumes:
+                Path(path).unlink(missing_ok=True)
+
+    threading.Thread(target=_run_and_cleanup, daemon=True).start()
+    return {"job_id": job.id}
+
+
+@app.get("/hr/batch-analysis/{job_id}")
+def get_batch_analysis_status(job_id: str):
+    job = get_batch_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="No job with that id (server may have restarted).")
     return job.to_dict()

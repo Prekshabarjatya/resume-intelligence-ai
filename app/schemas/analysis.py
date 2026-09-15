@@ -86,6 +86,38 @@ class AnalysisResult(BaseModel):
     recommendations: list[Recommendation]
 
 
+class CandidateStatus(str, Enum):
+    SCORED = "scored"
+    REJECTED_RESUME = "rejected_resume"
+    FAILED = "failed"
+
+
+class CandidateResult(BaseModel):
+    """One resume scored against the shared job profile in a batch/HR run.
+    Unlike AnalysisResult, there are no candidate-facing recommendations —
+    those are advice addressed to the resume's owner ("add X to your
+    resume"), which makes no sense in a screening context. Gaps are kept
+    since "what's missing" is neutral, useful screening information."""
+
+    filename: str
+    status: CandidateStatus
+    rejection_reason: str | None = None
+    error: str | None = None
+    resume_classification: DocumentClassification | None = None
+    resume_profile: ResumeProfile | None = None
+    skill_matches: list[SkillMatch] = Field(default_factory=list)
+    qualitative_match: QualitativeMatch | None = None
+    match_breakdown: MatchBreakdown | None = None
+    ats_analysis: ATSAnalysis | None = None
+    gaps: list[GapItem] = Field(default_factory=list)
+
+
+class BatchAnalysisResult(BaseModel):
+    jd_classification: DocumentClassification
+    job_profile: JobProfile
+    candidates: list[CandidateResult]
+
+
 class PipelineStatus(str, Enum):
     UPLOADED = "uploaded"
     VALIDATING_RESUME = "validating_resume"

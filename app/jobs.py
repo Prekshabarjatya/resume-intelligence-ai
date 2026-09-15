@@ -41,21 +41,28 @@ class JobRecord:
     id: str
     status: JobStatus = "running"
     completed_steps: list[str] = field(default_factory=list)
-    active_step: str | None = None
     outcome: PipelineOutcome | None = None
     error: str | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def steps_view(self) -> list[dict]:
+        """"Active" is derived from position, not tracked separately: the
+        first not-yet-completed step in order is the one presumably running
+        right now. Tracking a separate active_step field written at the same
+        time a node is marked complete meant the two updates always landed
+        together, so the completed check (checked first) always won and the
+        active state was never actually observable."""
         with self.lock:
-            completed = list(self.completed_steps)
-            active = self.active_step
+            completed = set(self.completed_steps)
+            still_running = self.status == "running"
         steps = []
+        active_assigned = False
         for name in STEP_ORDER:
             if name in completed:
                 state: StepState = "done"
-            elif name == active:
+            elif still_running and not active_assigned:
                 state = "active"
+                active_assigned = True
             else:
                 state = "pending"
             steps.append({"name": name, "label": STEP_LABELS[name], "state": state})
@@ -100,7 +107,6 @@ def run_job(job: JobRecord, resume_path: str, jd: str, jd_is_file: bool) -> None
 
     def on_step(node_name: str, _state) -> None:
         with job.lock:
-            job.active_step = node_name
             if node_name not in job.completed_steps:
                 job.completed_steps.append(node_name)
 
@@ -108,7 +114,6 @@ def run_job(job: JobRecord, resume_path: str, jd: str, jd_is_file: bool) -> None
         outcome = run_pipeline_with_progress(resume_path, jd, jd_is_file=jd_is_file, on_step=on_step)
         with job.lock:
             job.outcome = outcome
-            job.active_step = None
             if outcome.status.value.startswith("rejected"):
                 job.status = "rejected"
             else:
