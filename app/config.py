@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     groq_classifier_model: str = "openai/gpt-oss-20b"
     groq_reasoning_model: str = "openai/gpt-oss-120b"
 
+    # Optional shared-password gate for public deployments (see app/main.py).
+    # Empty (the local-dev default) means no auth is enforced.
+    app_password: str = ""
+
     max_optimization_iterations: int = 3
     max_upload_mb: int = 10
 

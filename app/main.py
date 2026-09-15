@@ -16,13 +16,15 @@ enough for one local dev process; a real deployment would swap this for
 Redis + a proper worker without touching the graph itself.
 """
 
+import base64
+import secrets
 import shutil
 import tempfile
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -33,6 +35,36 @@ from app.schemas.analysis import PipelineStatus
 app = FastAPI(title="Resume Intelligence Platform", version="0.1.0")
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Optional shared-password gate (HTTP Basic) for public deployments. Off by
+# default for local dev (settings.app_password == ""). /health is always
+# left open so a hosting platform's health check doesn't need credentials.
+# Username is ignored on purpose — this is a single shared password, not a
+# per-user account system.
+_UNPROTECTED_PATHS = {"/health"}
+
+
+@app.middleware("http")
+async def require_shared_password(request: Request, call_next):
+    if not settings.app_password or request.url.path in _UNPROTECTED_PATHS:
+        return await call_next(request)
+
+    header = request.headers.get("authorization", "")
+    supplied = ""
+    if header.startswith("Basic "):
+        try:
+            decoded = base64.b64decode(header[len("Basic ") :]).decode("utf-8")
+            _, _, supplied = decoded.partition(":")
+        except (ValueError, UnicodeDecodeError):
+            supplied = ""
+
+    if secrets.compare_digest(supplied, settings.app_password):
+        return await call_next(request)
+
+    return Response(
+        status_code=401,
+        headers={"WWW-Authenticate": 'Basic realm="Resume Intelligence Platform"'},
+    )
 
 ALLOWED_RESUME_EXTENSIONS = {".pdf", ".docx"}
 ALLOWED_JD_EXTENSIONS = {".pdf", ".docx", ".txt"}

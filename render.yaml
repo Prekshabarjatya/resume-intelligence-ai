@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: resume-intelligence-platform
+    runtime: python
+    plan: free
+    buildCommand: pip install .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_CLASSIFIER_MODEL
+        value: openai/gpt-oss-20b
+      - key: GROQ_REASONING_MODEL
+        value: openai/gpt-oss-120b
+      - key: APP_PASSWORD
+        sync: false

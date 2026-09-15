@@ -108,13 +108,50 @@ separate frontend project or build step. Upload a resume + JD, then:
   trivial exact match (semantic match or no-match), taken from the actual
   LLM judgment rather than summarized after the fact.
 
+## Deployment
+
+Deploys as a single always-on process — not to serverless/edge functions.
+Job progress (`app/jobs.py`) lives in an in-memory dict inside one process;
+a serverless platform that spins up a fresh instance per request would lose
+that state mid-poll, and running more than one instance would fragment it
+(one instance completes a job, a different one gets asked about it and
+returns 404). Fine for Render/Railway/Fly.io's "one web service" model, not
+fine for AWS Lambda/Vercel functions without swapping in a real queue.
+
+### Render
+
+`render.yaml` in the repo root is a Blueprint — Render reads it automatically.
+
+1. Push this repo to GitHub.
+2. On [render.com](https://render.com): New → Blueprint → pick the repo.
+3. Render finds `render.yaml` and provisions the service. Before the first
+   deploy, set these in the dashboard (marked `sync: false` in the
+   Blueprint, so Render won't ask you to hardcode them in git):
+   - `GROQ_API_KEY` — your key from console.groq.com
+   - `APP_PASSWORD` — a shared password gating the whole app (see below);
+     leave unset for no password
+4. Deploy. Render builds with `pip install .` and runs
+   `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+
+Free-tier services spin down after inactivity — the first request after a
+quiet period will be slow (cold start) while it spins back up.
+
+### Password protection
+
+The app is a thin wrapper around your Groq API key — a public URL with no
+password means anyone who finds it can run analyses on your quota. Setting
+`APP_PASSWORD` gates every route except `/health` (left open so the
+platform's health check doesn't need credentials) behind HTTP Basic Auth —
+the browser's native login prompt, any username, this password. Leave it
+unset for local dev.
+
 ## Tests
 
 ```bash
 .venv/bin/python -m pytest
 ```
 
-27 tests, all offline — every LLM call is mocked, so no `GROQ_API_KEY` or
+32 tests, all offline — every LLM call is mocked, so no `GROQ_API_KEY` or
 network access is needed to run the suite. `sample_data/` has a sample
 resume/JD for a real end-to-end run once you've set your key.
 
@@ -136,6 +173,7 @@ app/
 cli.py            Local runner
 tests/            Unit tests (deterministic tools) + fully-mocked graph/job tests
 sample_data/      Example resume.docx + jd.txt for a manual end-to-end run
+render.yaml       Render Blueprint (see "Deployment" above)
 ```
 
 ## Notable design decisions
