@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Resume Intelligence Platform</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --surface: #ffffff;
+    --border: #e3e6ee;
+    --text: #1c2130;
+    --text-muted: #6b7280;
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --success: #16a34a;
+    --warning: #d97706;
+    --danger: #dc2626;
+    --track: #eef0f6;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
+  header { margin-bottom: 28px; }
+  header h1 { font-size: 24px; margin: 0 0 4px; }
+  header p { color: var(--text-muted); margin: 0; font-size: 14px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 16px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  input[type="file"], textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: var(--bg); color: var(--text);
+  }
+  textarea { resize: vertical; min-height: 120px; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+  .tab-btn {
+    padding: 6px 12px; border: 1px solid var(--border); background: var(--surface);
+    border-radius: 999px; font-size: 13px; cursor: pointer; color: var(--text-muted);
+  }
+  .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--primary); color: white; border: none; border-radius: 8px;
+    padding: 12px 22px; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .btn:hover { background: var(--primary-dark); }
+  .btn:disabled { opacity: .6; cursor: not-allowed; }
+
+  #status { margin-top: 16px; font-size: 14px; color: var(--text-muted); }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.4);
+    border-top-color: white; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .banner { padding: 14px 18px; border-radius: 10px; font-size: 14px; margin-bottom: 20px; }
+  .banner.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  .banner.reject { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+  .score-hero { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+  .score-circle {
+    width: 120px; height: 120px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    background: conic-gradient(var(--primary) calc(var(--pct) * 1%), var(--track) 0);
+    flex-shrink: 0;
+  }
+  .score-circle .inner {
+    width: 96px; height: 96px; border-radius: 50%; background: var(--surface);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .score-circle .num { font-size: 26px; font-weight: 700; }
+  .score-circle .lbl { font-size: 11px; color: var(--text-muted); }
+
+  .bars { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: 140px 1fr 40px; align-items: center; gap: 10px; font-size: 13px; }
+  .bar-track { background: var(--track); border-radius: 999px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--primary); border-radius: 999px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.exact { background: #dcfce7; color: #166534; }
+  .badge.semantic { background: #fef9c3; color: #854d0e; }
+  .badge.none { background: #fee2e2; color: #991b1b; }
+  .badge.required { background: #e0e7ff; color: #3730a3; }
+  .badge.preferred { background: #f1f5f9; color: #475569; }
+
+  .issue-row, .gap-row, .rec-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .issue-row:last-child, .gap-row:last-child, .rec-row:last-child { border-bottom: none; }
+  .sev, .prio { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; margin-right: 8px; }
+  .sev.high, .prio.critical { background: #fee2e2; color: #991b1b; }
+  .sev.medium, .prio.high { background: #ffedd5; color: #9a3412; }
+  .sev.low, .prio.medium { background: #fef9c3; color: #854d0e; }
+  .prio.low { background: #e0e7ff; color: #3730a3; }
+  .rec-row .title { font-weight: 600; }
+  .rec-row .detail, .gap-row .detail { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+  #results { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Resume Intelligence Platform</h1>
+    <p>Upload a resume and a job description to get an explainable match score, gap analysis, and recommendations.</p>
+  </header>
+
+  <div class="card">
+    <h2>1. Resume</h2>
+    <label for="resumeFile">Resume file (PDF or DOCX)</label>
+    <input type="file" id="resumeFile" accept=".pdf,.docx" />
+  </div>
+
+  <div class="card">
+    <h2>2. Job Description</h2>
+    <div class="tabs">
+      <button type="button" class="tab-btn active" data-tab="paste">Paste text</button>
+      <button type="button" class="tab-btn" data-tab="upload">Upload file</button>
+    </div>
+    <div class="tab-pane active" id="tab-paste">
+      <textarea id="jdText" placeholder="Paste the job description here..."></textarea>
+    </div>
+    <div class="tab-pane" id="tab-upload">
+      <label for="jdFile">JD file (PDF, DOCX, or TXT)</label>
+      <input type="file" id="jdFile" accept=".pdf,.docx,.txt" />
+    </div>
+  </div>
+
+  <button class="btn" id="analyzeBtn" type="button">Analyze fit</button>
+  <div id="status"></div>
+
+  <div id="resultsWrap" style="margin-top: 28px;"></div>
+</div>
+
+<script>
+const tabButtons = document.querySelectorAll('.tab-btn');
+tabButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabButtons.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') node.className = v;
+    else if (k === 'text') node.textContent = v;
+    else node.setAttribute(k, v);
+  }
+  children.forEach(c => node.appendChild(c));
+  return node;
+}
+
+function scoreBar(label, value) {
+  const row = el('div', { class: 'bar-row' });
+  row.appendChild(el('div', { text: label }));
+  const track = el('div', { class: 'bar-track' });
+  track.appendChild(el('div', { class: 'bar-fill', style: `width:${value}%` }));
+  row.appendChild(track);
+  row.appendChild(el('div', { text: Math.round(value) + '%' }));
+  return row;
+}
+
+function renderResults(result) {
+  const wrap = document.getElementById('resultsWrap');
+  wrap.innerHTML = '';
+
+  // Score hero
+  const mb = result.match_breakdown;
+  const scoreCard = el('div', { class: 'card' });
+  scoreCard.appendChild(el('h2', { text: 'Overall Match' }));
+  const hero = el('div', { class: 'score-hero' });
+  const circle = el('div', { class: 'score-circle' });
+  circle.style.setProperty('--pct', mb.overall_score);
+  const inner = el('div', { class: 'inner' });
+  inner.appendChild(el('div', { class: 'num', text: Math.round(mb.overall_score) + '%' }));
+  inner.appendChild(el('div', { class: 'lbl', text: 'overall' }));
+  circle.appendChild(inner);
+  hero.appendChild(circle);
+  const bars = el('div', { class: 'bars' });
+  bars.appendChild(scoreBar('Skill match', mb.skill_match));
+  bars.appendChild(scoreBar('Experience', mb.experience_match));
+  bars.appendChild(scoreBar('Responsibilities', mb.responsibility_match));
+  bars.appendChild(scoreBar('Keyword coverage', mb.keyword_coverage));
+  bars.appendChild(scoreBar('Qualifications', mb.qualification_match));
+  bars.appendChild(scoreBar('ATS compatibility', mb.ats_compatibility));
+  hero.appendChild(bars);
+  scoreCard.appendChild(hero);
+  wrap.appendChild(scoreCard);
+
+  // Two-column: skill matches + ATS
+  const grid = el('div', { class: 'grid-2' });
+
+  const skillCard = el('div', { class: 'card' });
+  skillCard.appendChild(el('h2', { text: 'Skill Matches' }));
+  const table = el('table');
+  const thead = el('tr');
+  ['Skill', 'Type', 'Match', ''].forEach(h => thead.appendChild(el('th', { text: h })));
+  table.appendChild(thead);
+  result.skill_matches.forEach(m => {
+    const tr = el('tr');
+    tr.appendChild(el('td', { text: m.required_skill }));
+    tr.appendChild(el('td', {}, [el('span', { class: 'badge ' + m.importance, text: m.importance })]));
+    tr.appendChild(el('td', {}, [el('span', { class: 'badge ' + m.match_type, text: m.match_type })]));
+    tr.appendChild(el('td', { text: m.matched_resume_skill || '—' }));
+    table.appendChild(tr);
+  });
+  skillCard.appendChild(table);
+  grid.appendChild(skillCard);
+
+  const atsCard = el('div', { class: 'card' });
+  atsCard.appendChild(el('h2', { text: `ATS Analysis — ${Math.round(result.ats_analysis.score)}%` }));
+  if (result.ats_analysis.issues.length === 0) {
+    atsCard.appendChild(el('p', { text: 'No ATS issues detected.', style: 'color:var(--text-muted);font-size:13px;' }));
+  }
+  result.ats_analysis.issues.forEach(issue => {
+    const row = el('div', { class: 'issue-row' });
+    row.appendChild(el('span', { class: 'sev ' + issue.severity, text: issue.severity }));
+    row.appendChild(el('span', { text: issue.issue }));
+    atsCard.appendChild(row);
+  });
+  grid.appendChild(atsCard);
+  wrap.appendChild(grid);
+
+  // Gaps
+  const gapCard = el('div', { class: 'card' });
+  gapCard.appendChild(el('h2', { text: 'Gaps' }));
+  if (result.gaps.length === 0) {
+    gapCard.appendChild(el('p', { text: 'No significant gaps found.', style: 'color:var(--text-muted);font-size:13px;' }));
+  }
+  result.gaps.forEach(g => {
+    const row = el('div', { class: 'gap-row' });
+    row.appendChild(el('div', { class: 'title', text: `[${g.category}] ${g.description}` }));
+    row.appendChild(el('div', { class: 'detail', text: g.recommendation }));
+    gapCard.appendChild(row);
+  });
+  wrap.appendChild(gapCard);
+
+  // Recommendations
+  const recCard = el('div', { class: 'card' });
+  recCard.appendChild(el('h2', { text: 'Recommendations' }));
+  result.recommendations.forEach(r => {
+    const row = el('div', { class: 'rec-row' });
+    const titleRow = el('div');
+    titleRow.appendChild(el('span', { class: 'prio ' + r.priority, text: r.priority }));
+    titleRow.appendChild(el('span', { class: 'title', text: r.title }));
+    row.appendChild(titleRow);
+    row.appendChild(el('div', { class: 'detail', text: r.detail }));
+    recCard.appendChild(row);
+  });
+  wrap.appendChild(recCard);
+}
+
+function renderBanner(className, text) {
+  const wrap = document.getElementById('resultsWrap');
+  wrap.innerHTML = '';
+  wrap.appendChild(el('div', { class: 'banner ' + className, text }));
+}
+
+document.getElementById('analyzeBtn').addEventListener('click', async () => {
+  const resumeFile = document.getElementById('resumeFile').files[0];
+  const jdText = document.getElementById('jdText').value.trim();
+  const jdFile = document.getElementById('jdFile').files[0];
+  const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+
+  const status = document.getElementById('status');
+  const btn = document.getElementById('analyzeBtn');
+
+  if (!resumeFile) { status.textContent = 'Please choose a resume file.'; return; }
+  if (activeTab === 'paste' && !jdText) { status.textContent = 'Please paste a job description.'; return; }
+  if (activeTab === 'upload' && !jdFile) { status.textContent = 'Please choose a JD file.'; return; }
+
+  const formData = new FormData();
+  formData.append('resume_file', resumeFile);
+  if (activeTab === 'paste') formData.append('jd_text', jdText);
+  else formData.append('jd_file', jdFile);
+
+  btn.disabled = true;
+  status.innerHTML = '<span class="spinner"></span> Analyzing — this can take up to a minute...';
+  document.getElementById('resultsWrap').innerHTML = '';
+
+  try {
+    const resp = await fetch('/analysis', { method: 'POST', body: formData });
+    const data = await resp.json();
+
+    if (resp.status === 422) {
+      renderBanner('reject', `Rejected: ${data.reason}`);
+    } else if (!resp.ok) {
+      renderBanner('error', `Error: ${data.detail || resp.statusText}`);
+    } else {
+      renderResults(data.result);
+    }
+    status.textContent = '';
+  } catch (err) {
+    renderBanner('error', `Request failed: ${err.message}`);
+    status.textContent = '';
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

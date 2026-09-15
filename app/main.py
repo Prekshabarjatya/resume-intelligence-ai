@@ -10,12 +10,15 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.pipeline import run_pipeline
 from app.schemas.analysis import PipelineStatus
 
 app = FastAPI(title="Resume Intelligence Platform", version="0.1.0")
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 ALLOWED_RESUME_EXTENSIONS = {".pdf", ".docx"}
 ALLOWED_JD_EXTENSIONS = {".pdf", ".docx", ".txt"}
@@ -77,3 +80,9 @@ async def create_analysis(
         )
 
     return {"status": outcome.status.value, "result": outcome.result.model_dump()}
+
+
+# Mounted last so it never shadows the API routes above — StaticFiles at "/"
+# matches any path Starlette hasn't already resolved, and route order is
+# registration order.
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
