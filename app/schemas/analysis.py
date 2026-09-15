@@ -20,6 +20,9 @@ class SkillMatch(BaseModel):
     match_type: MatchType
     matched_resume_skill: str | None = None
     similarity: float = 0.0
+    reasoning: str = Field(
+        default="", description="Why this was (or wasn't) judged a match — empty for trivial exact matches."
+    )
 
 
 class ATSIssue(BaseModel):
@@ -76,6 +79,7 @@ class AnalysisResult(BaseModel):
     resume_profile: ResumeProfile
     job_profile: JobProfile
     skill_matches: list[SkillMatch]
+    qualitative_match: QualitativeMatch
     match_breakdown: MatchBreakdown
     ats_analysis: ATSAnalysis
     gaps: list[GapItem]

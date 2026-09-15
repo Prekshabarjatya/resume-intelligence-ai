@@ -118,6 +118,30 @@
   .rec-row .title { font-weight: 600; }
   .rec-row .detail, .gap-row .detail { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
 
+  .steps-list { display: flex; flex-direction: column; gap: 2px; }
+  .step-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 14px; }
+  .step-icon { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .step-row.done .step-icon { color: var(--success); }
+  .step-row.done span.label { color: var(--text); }
+  .step-row.active .step-icon .spinner-sm {
+    width: 13px; height: 13px; border: 2px solid var(--track); border-top-color: var(--primary);
+    border-radius: 50%; animation: spin .7s linear infinite; display: inline-block;
+  }
+  .step-row.active span.label { color: var(--primary); font-weight: 600; }
+  .step-row.pending { opacity: .45; }
+  .step-row.pending .step-icon { color: var(--text-muted); }
+
+  .why-row td { padding: 0 6px 10px; border-bottom: 1px solid var(--border); }
+  .why-row .why-text { font-size: 12px; color: var(--text-muted); font-style: italic; padding-left: 2px; }
+
+  .reasoning-note { font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 6px; padding-left: 152px; }
+  @media (max-width: 600px) { .reasoning-note { padding-left: 0; } }
+
+  .classif-row { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .classif-row:last-child { border-bottom: none; }
+  .classif-row .doc-type { font-weight: 600; }
+  .classif-row .reason { color: var(--text-muted); flex: 1; text-align: right; }
+
   #results { display: none; }
 </style>
 </head>
@@ -151,6 +175,11 @@
 
   <button class="btn" id="analyzeBtn" type="button">Analyze fit</button>
   <div id="status"></div>
+
+  <div class="card" id="stepsCard" style="display:none; margin-top: 20px;">
+    <h2>Pipeline Progress</h2>
+    <div class="steps-list" id="stepsList"></div>
+  </div>
 
   <div id="resultsWrap" style="margin-top: 28px;"></div>
 </div>
@@ -187,9 +216,50 @@ function scoreBar(label, value) {
   return row;
 }
 
+const STEP_ICONS = {
+  done: '✓',
+  active: '',
+  pending: '○',
+};
+
+function renderSteps(steps) {
+  const card = document.getElementById('stepsCard');
+  const list = document.getElementById('stepsList');
+  card.style.display = 'block';
+  list.innerHTML = '';
+  steps.forEach(step => {
+    const row = el('div', { class: 'step-row ' + step.state });
+    const icon = el('div', { class: 'step-icon' });
+    if (step.state === 'active') {
+      icon.appendChild(el('span', { class: 'spinner-sm' }));
+    } else {
+      icon.textContent = STEP_ICONS[step.state];
+    }
+    row.appendChild(icon);
+    row.appendChild(el('span', { class: 'label', text: step.label }));
+    list.appendChild(row);
+  });
+}
+
 function renderResults(result) {
   const wrap = document.getElementById('resultsWrap');
   wrap.innerHTML = '';
+
+  // Document classification — why each document was accepted
+  const classifCard = el('div', { class: 'card' });
+  classifCard.appendChild(el('h2', { text: 'Document Classification' }));
+  [
+    ['Resume', result.resume_classification],
+    ['Job Description', result.jd_classification],
+  ].forEach(([label, c]) => {
+    const row = el('div', { class: 'classif-row' });
+    row.appendChild(el('span', {}, [
+      el('span', { class: 'doc-type', text: `${label}: ${c.document_type} (${Math.round(c.confidence * 100)}% confidence)` }),
+    ]));
+    row.appendChild(el('span', { class: 'reason', text: c.reason }));
+    classifCard.appendChild(row);
+  });
+  wrap.appendChild(classifCard);
 
   // Score hero
   const mb = result.match_breakdown;
@@ -212,6 +282,18 @@ function renderResults(result) {
   bars.appendChild(scoreBar('ATS compatibility', mb.ats_compatibility));
   hero.appendChild(bars);
   scoreCard.appendChild(hero);
+
+  const qm = result.qualitative_match;
+  if (qm) {
+    scoreCard.appendChild(el('div', {
+      class: 'reasoning-note',
+      text: `Responsibilities: ${qm.responsibility_reasoning}`,
+    }));
+    scoreCard.appendChild(el('div', {
+      class: 'reasoning-note',
+      text: `Qualifications: ${qm.qualification_reasoning}`,
+    }));
+  }
   wrap.appendChild(scoreCard);
 
   // Two-column: skill matches + ATS
@@ -230,6 +312,14 @@ function renderResults(result) {
     tr.appendChild(el('td', {}, [el('span', { class: 'badge ' + m.match_type, text: m.match_type })]));
     tr.appendChild(el('td', { text: m.matched_resume_skill || '—' }));
     table.appendChild(tr);
+
+    if (m.reasoning && m.match_type !== 'exact') {
+      const whyTr = el('tr', { class: 'why-row' });
+      const whyTd = el('td', { colspan: '4' });
+      whyTd.appendChild(el('div', { class: 'why-text', text: `Why: ${m.reasoning}` }));
+      whyTr.appendChild(whyTd);
+      table.appendChild(whyTr);
+    }
   });
   skillCard.appendChild(table);
   grid.appendChild(skillCard);
@@ -283,6 +373,28 @@ function renderBanner(className, text) {
   wrap.appendChild(el('div', { class: 'banner ' + className, text }));
 }
 
+const POLL_INTERVAL_MS = 700;
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function pollJob(jobId) {
+  while (true) {
+    const resp = await fetch(`/analysis/${jobId}`);
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      throw new Error(data.detail || `Polling failed (${resp.status})`);
+    }
+    const data = await resp.json();
+    renderSteps(data.steps);
+
+    if (data.status === 'completed') return { kind: 'completed', result: data.result };
+    if (data.status === 'rejected') return { kind: 'rejected', reason: data.reason };
+    if (data.status === 'failed') return { kind: 'failed', error: data.error };
+
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
 document.getElementById('analyzeBtn').addEventListener('click', async () => {
   const resumeFile = document.getElementById('resumeFile').files[0];
   const jdText = document.getElementById('jdText').value.trim();
@@ -302,21 +414,29 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
   else formData.append('jd_file', jdFile);
 
   btn.disabled = true;
-  status.innerHTML = '<span class="spinner"></span> Analyzing — this can take up to a minute...';
+  status.textContent = 'Starting analysis...';
   document.getElementById('resultsWrap').innerHTML = '';
+  document.getElementById('stepsCard').style.display = 'none';
 
   try {
-    const resp = await fetch('/analysis', { method: 'POST', body: formData });
-    const data = await resp.json();
-
-    if (resp.status === 422) {
-      renderBanner('reject', `Rejected: ${data.reason}`);
-    } else if (!resp.ok) {
-      renderBanner('error', `Error: ${data.detail || resp.statusText}`);
-    } else {
-      renderResults(data.result);
+    const startResp = await fetch('/analysis/start', { method: 'POST', body: formData });
+    const startData = await startResp.json();
+    if (!startResp.ok) {
+      renderBanner('error', `Error: ${startData.detail || startResp.statusText}`);
+      status.textContent = '';
+      return;
     }
+
     status.textContent = '';
+    const outcome = await pollJob(startData.job_id);
+
+    if (outcome.kind === 'rejected') {
+      renderBanner('reject', `Rejected: ${outcome.reason}`);
+    } else if (outcome.kind === 'failed') {
+      renderBanner('error', `Analysis failed: ${outcome.error}`);
+    } else {
+      renderResults(outcome.result);
+    }
   } catch (err) {
     renderBanner('error', `Request failed: ${err.message}`);
     status.textContent = '';

@@ -110,6 +110,7 @@ def resolve_unmatched_skills(
                     match_type=MatchType.SEMANTIC,
                     matched_resume_skill=judgment.matched_resume_skill,
                     similarity=judgment.confidence,
+                    reasoning=judgment.reasoning,
                 )
             )
         else:
@@ -120,6 +121,7 @@ def resolve_unmatched_skills(
                     match_type=MatchType.NONE,
                     matched_resume_skill=None,
                     similarity=judgment.confidence if judgment else 0.0,
+                    reasoning=judgment.reasoning if judgment else "",
                 )
             )
     return results

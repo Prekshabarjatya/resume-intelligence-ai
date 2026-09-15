@@ -5,10 +5,16 @@ Optimization Platform: upload a resume and a job description, validate both,
 extract structured profiles, match skills/experience, and get an explainable
 gap analysis and recommendations.
 
+Includes a single-page UI (`app/static/index.html`, served by the FastAPI
+app itself) that shows live per-step pipeline progress and the reasoning
+behind every score — see "UI" below.
+
 Out of scope for this slice (see the full PRD for the eventual system):
 auth, the Next.js frontend, resume optimization/generation, fact validation
-of generated content, Postgres/Redis/Docker, async job queue. This runs
-synchronously via a CLI or a single FastAPI endpoint.
+of generated content, Postgres/Redis/Docker, a real message queue. Jobs run
+in a background thread with in-memory status tracking (`app/jobs.py`) — good
+enough for one local dev process, not a substitute for the PRD's eventual
+Redis-backed worker.
 
 ## Architecture
 
@@ -60,6 +66,13 @@ cp .env.example .env
 
 ## Run
 
+UI (recommended — shows live pipeline progress and reasoning):
+
+```bash
+.venv/bin/uvicorn app.main:app --reload
+# open http://localhost:8000
+```
+
 CLI (no server needed):
 
 ```bash
@@ -68,13 +81,32 @@ CLI (no server needed):
 .venv/bin/python cli.py sample_data/resume.docx --jd-file sample_data/jd.txt
 ```
 
-API server:
+API directly:
 
 ```bash
-.venv/bin/uvicorn app.main:app --reload
+# Synchronous — blocks until done, returns the full result:
 # POST /analysis (multipart/form-data): resume_file + (jd_text or jd_file)
+
+# Async — what the UI uses, returns immediately with a job_id to poll:
+# POST /analysis/start  -> {"job_id": "..."}
+# GET  /analysis/{job_id} -> {"status": "running"|"completed"|"rejected"|"failed", "steps": [...], "result"?: ...}
+
 # GET  /health
 ```
+
+## UI
+
+`app/static/index.html`, mounted as static files by `app/main.py` — no
+separate frontend project or build step. Upload a resume + JD, then:
+
+- **Pipeline Progress** updates live from the actual LangGraph execution
+  (`app/jobs.py` polls `graph.stream(..., stream_mode="updates")` under the
+  hood) — it shows which node just finished, not a fake timer.
+- Every score comes with its reasoning: document classification reasons,
+  the qualitative-match agent's explanation for the responsibility/
+  qualification bars, and a "Why" line under any skill match that wasn't a
+  trivial exact match (semantic match or no-match), taken from the actual
+  LLM judgment rather than summarized after the fact.
 
 ## Tests
 
@@ -82,9 +114,9 @@ API server:
 .venv/bin/python -m pytest
 ```
 
-23 tests, all offline — every LLM call in the graph tests is mocked, so no
-`GROQ_API_KEY` or network access is needed to run the suite. `sample_data/`
-has a sample resume/JD for a real end-to-end run once you've set your key.
+27 tests, all offline — every LLM call is mocked, so no `GROQ_API_KEY` or
+network access is needed to run the suite. `sample_data/` has a sample
+resume/JD for a real end-to-end run once you've set your key.
 
 ## Project layout
 
@@ -97,10 +129,12 @@ app/
   agents/         Real Groq LLM calls: validation, extraction, skill-synonym
                   judgment, qualitative matching, gap analysis, recommendations
   graph.py        LangGraph orchestration wiring it all together
-  pipeline.py     Shared entry point used by both the CLI and the API
-  main.py         FastAPI app
+  pipeline.py     Shared entry point used by the CLI, sync API, and job runner
+  jobs.py         In-memory async job tracking (real per-step progress for the UI)
+  main.py         FastAPI app (serves the UI + both sync and async endpoints)
+  static/         Single-page UI (plain HTML/CSS/JS, no build step)
 cli.py            Local runner
-tests/            Unit tests (deterministic tools) + fully-mocked graph tests
+tests/            Unit tests (deterministic tools) + fully-mocked graph/job tests
 sample_data/      Example resume.docx + jd.txt for a manual end-to-end run
 ```
 
