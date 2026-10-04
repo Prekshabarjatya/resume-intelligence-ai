@@ -10,32 +10,38 @@
     --surface: #ffffff;
     --border: #e2e8f0;
     --text: #0f172a;
-    --text-muted: #64748b;
+    --text-muted: #556171;
     --primary: #0f766e;
     --primary-dark: #115e59;
+    --primary-tint: #ccfbf1;
     --success: #16a34a;
     --warning: #d97706;
     --danger: #dc2626;
     --track: #e2e8f0;
+    /* Shape rule: cards 12, controls 8, pills and badges full. */
     --radius: 12px;
+    --radius-control: 8px;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    line-height: 1.5;
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
   }
-  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
-  header { margin-bottom: 20px; }
-  header h1 { font-size: 24px; margin: 0 0 4px; }
-  header p { color: var(--text-muted); margin: 0; font-size: 14px; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  ::placeholder { color: var(--text-muted); opacity: 1; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 20px 96px; }
+  header { margin-bottom: 28px; }
+  header h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; margin: 0 0 8px; }
+  header p { color: var(--text-muted); margin: 0; font-size: 15px; max-width: 65ch; }
 
-  .mode-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .mode-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
   .mode-btn {
     padding: 10px 18px; border: 1px solid var(--border); background: var(--surface);
-    border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text-muted);
+    border-radius: var(--radius-control); font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text-muted);
   }
   .mode-btn.active { background: var(--text); color: white; border-color: var(--text); }
   .mode-btn:active { transform: scale(0.98); }
@@ -47,14 +53,28 @@
     padding: 24px;
     margin-bottom: 20px;
   }
-  .card h2 { font-size: 15px; margin: 0 0 16px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+  .card h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 16px; color: var(--text); }
+
+  .run-metrics {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .run-metrics div { padding: 16px 0; }
+  .run-metrics div + div { padding-left: 24px; border-left: 1px solid var(--border); }
+  .run-metrics .val { font-size: 28px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+  .run-metrics .key { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  @media (max-width: 600px) {
+    .run-metrics { grid-template-columns: 1fr; }
+    .run-metrics div + div { padding-left: 0; border-left: none; border-top: 1px solid var(--border); }
+  }
 
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
 
   label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
   input[type="file"], textarea {
-    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-control);
     font-size: 14px; font-family: inherit; background: var(--bg); color: var(--text);
   }
   textarea { resize: vertical; min-height: 120px; }
@@ -71,8 +91,9 @@
 
   .btn {
     display: inline-flex; align-items: center; gap: 8px;
-    background: var(--primary); color: white; border: none; border-radius: 8px;
+    background: var(--primary); color: white; border: none; border-radius: var(--radius-control);
     padding: 12px 22px; font-size: 15px; font-weight: 600; cursor: pointer;
+    transition: background .2s ease, transform .2s ease;
   }
   .btn:hover { background: var(--primary-dark); }
   .btn:active:not(:disabled) { transform: scale(0.98); }
@@ -110,7 +131,7 @@
   .badge.exact { background: #dcfce7; color: #166534; }
   .badge.semantic { background: #fef9c3; color: #854d0e; }
   .badge.none { background: #fee2e2; color: #991b1b; }
-  .badge.required { background: #e0e7ff; color: #3730a3; }
+  .badge.required { background: var(--primary-tint); color: var(--primary-dark); }
   .badge.preferred { background: #f1f5f9; color: #475569; }
 
   .issue-row, .gap-row, .rec-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -119,7 +140,7 @@
   .sev.high, .prio.critical { background: #fee2e2; color: #991b1b; }
   .sev.medium, .prio.high { background: #ffedd5; color: #9a3412; }
   .sev.low, .prio.medium { background: #fef9c3; color: #854d0e; }
-  .prio.low { background: #e0e7ff; color: #3730a3; }
+  .prio.low { background: #f1f5f9; color: #475569; }
   .rec-row .title { font-weight: 600; }
   .rec-row .detail, .gap-row .detail { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
 
@@ -162,6 +183,11 @@
   .classif-row .reason { color: var(--text-muted); flex: 1; text-align: right; }
 
   #results { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .step-row.active .step-icon .pulse-dot { animation: none; }
+    .btn, .mode-btn, .tab-btn { transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -178,13 +204,13 @@
 
   <div id="candidateMode">
     <div class="card">
-      <h2>1. Resume</h2>
+      <h2>Resume</h2>
       <label for="resumeFile">Resume file (PDF or DOCX)</label>
       <input type="file" id="resumeFile" accept=".pdf,.docx" />
     </div>
 
     <div class="card">
-      <h2>2. Job Description</h2>
+      <h2>Job description</h2>
       <div class="tab-group">
         <div class="tabs">
           <button type="button" class="tab-btn active" data-tab="paste">Paste text</button>
@@ -205,7 +231,7 @@
 
   <div id="hrMode" style="display:none;">
     <div class="card">
-      <h2>1. Job Description</h2>
+      <h2>Job description</h2>
       <div class="tab-group">
         <div class="tabs">
           <button type="button" class="tab-btn active" data-tab="paste">Paste text</button>
@@ -222,7 +248,7 @@
     </div>
 
     <div class="card">
-      <h2>2. Candidate resumes</h2>
+      <h2>Candidate resumes</h2>
       <label for="hrResumeFiles">Resume files (PDF or DOCX, up to 20 at once)</label>
       <input type="file" id="hrResumeFiles" accept=".pdf,.docx" multiple />
     </div>
@@ -318,9 +344,28 @@ function renderSteps(steps) {
   });
 }
 
-function renderResults(result) {
+function renderMetrics(metrics) {
+  if (!metrics) return null;
+  const strip = el('div', { class: 'run-metrics' });
+  [
+    [`${metrics.runtime_seconds}s`, 'Analysis time'],
+    [String(metrics.skills_matched), 'Skills matched'],
+    [String(metrics.gaps_identified), 'Gaps found'],
+  ].forEach(([val, key]) => {
+    strip.appendChild(el('div', {}, [
+      el('div', { class: 'val', text: val }),
+      el('div', { class: 'key', text: key }),
+    ]));
+  });
+  return strip;
+}
+
+function renderResults(result, metrics) {
   const wrap = document.getElementById('resultsWrap');
   wrap.innerHTML = '';
+
+  const metricsStrip = renderMetrics(metrics);
+  if (metricsStrip) wrap.appendChild(metricsStrip);
 
   // Document classification: why each document was accepted
   const classifCard = el('div', { class: 'card' });
@@ -464,7 +509,7 @@ async function pollJob(jobId) {
     const data = await resp.json();
     renderSteps(data.steps);
 
-    if (data.status === 'completed') return { kind: 'completed', result: data.result };
+    if (data.status === 'completed') return { kind: 'completed', result: data.result, metrics: data.metrics };
     if (data.status === 'rejected') return { kind: 'rejected', reason: data.reason };
     if (data.status === 'failed') return { kind: 'failed', error: data.error };
 
@@ -512,7 +557,7 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
     } else if (outcome.kind === 'failed') {
       renderBanner('error', `Analysis failed: ${outcome.error}`);
     } else {
-      renderResults(outcome.result);
+      renderResults(outcome.result, outcome.metrics);
     }
   } catch (err) {
     renderBanner('error', `Request failed: ${err.message}`);

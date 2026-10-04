@@ -194,3 +194,15 @@ render.yaml       Render Blueprint (see "Deployment" above)
 - **Hallucination guardrails**: extraction requires verbatim source evidence
   for experience/project entries; gap analysis is explicitly instructed
   never to suggest fabricating experience, only to flag genuine gaps.
+
+## Run metrics
+
+Every analysis response (`POST /analysis`, and `GET /analysis/{job_id}` once the job completes) includes a `metrics` object:
+
+| Field | Meaning |
+|---|---|
+| `runtime_seconds` | Wall-clock time for the full pipeline |
+| `skills_matched` | Number of required skills matched to the resume |
+| `gaps_identified` | Number of gaps found |
+
+The UI shows these above the results. Token usage and match accuracy are not tracked yet: accuracy needs a set of manually labelled resume/JD pairs to compare against, so any accuracy figure on a resume should come from that, not from this code.
