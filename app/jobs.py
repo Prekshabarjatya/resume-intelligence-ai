@@ -11,6 +11,7 @@ it does not survive a server restart and does not scale past one process.
 """
 
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Literal
@@ -44,6 +45,7 @@ class JobRecord:
     outcome: PipelineOutcome | None = None
     error: str | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
+    created_at: float = field(default_factory=time.monotonic)
 
     def steps_view(self) -> list[dict]:
         """"Active" is derived from position, not tracked separately: the
@@ -89,16 +91,26 @@ _JOBS: dict[str, JobRecord] = {}
 _JOBS_LOCK = threading.Lock()
 
 
+JOB_TTL_SECONDS = 3600
+
+
 def create_job() -> JobRecord:
     job = JobRecord(id=str(uuid.uuid4()))
     with _JOBS_LOCK:
+        # Resumes live only in memory; drop old jobs so nothing lingers.
+        for stale in [j for j, rec in _JOBS.items() if job.created_at - rec.created_at > JOB_TTL_SECONDS]:
+            del _JOBS[stale]
         _JOBS[job.id] = job
     return job
 
 
 def get_job(job_id: str) -> JobRecord | None:
     with _JOBS_LOCK:
-        return _JOBS.get(job_id)
+        job = _JOBS.get(job_id)
+        if job is not None and time.monotonic() - job.created_at > JOB_TTL_SECONDS:
+            del _JOBS[job_id]
+            return None
+        return job
 
 
 def run_job(job: JobRecord, resume_path: str, jd: str, jd_is_file: bool) -> None:

@@ -11,6 +11,7 @@ app/jobs.py.
 """
 
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Literal
@@ -31,6 +32,7 @@ class BatchJobRecord:
     outcome: BatchOutcome | None = None
     error: str | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
+    created_at: float = field(default_factory=time.monotonic)
 
     def steps_view(self) -> list[dict]:
         with self.lock:
@@ -77,13 +79,19 @@ def create_batch_job(resume_filenames: list[str]) -> BatchJobRecord:
     }
     job = BatchJobRecord(id=str(uuid.uuid4()), step_order=step_order, step_labels=step_labels)
     with _BATCH_JOBS_LOCK:
+        for stale in [j for j, rec in _BATCH_JOBS.items() if job.created_at - rec.created_at > 3600]:
+            del _BATCH_JOBS[stale]
         _BATCH_JOBS[job.id] = job
     return job
 
 
 def get_batch_job(job_id: str) -> BatchJobRecord | None:
     with _BATCH_JOBS_LOCK:
-        return _BATCH_JOBS.get(job_id)
+        job = _BATCH_JOBS.get(job_id)
+        if job is not None and time.monotonic() - job.created_at > 3600:
+            del _BATCH_JOBS[job_id]
+            return None
+        return job
 
 
 def run_batch_job(job: BatchJobRecord, jd: str, resumes: list[tuple[str, str]], jd_is_file: bool) -> None:

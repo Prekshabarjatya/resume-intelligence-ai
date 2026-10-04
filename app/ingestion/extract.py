@@ -12,8 +12,19 @@ import docx
 import pymupdf as fitz
 
 from app.schemas.document import ExtractedDocument, SourceFormat
+from app.security import clean_untrusted_text, neutralize_injection
 
 MIN_CHARS_PER_PAGE_WARNING = 20
+
+
+def _sanitize(doc: ExtractedDocument) -> ExtractedDocument:
+    """Single choke point: every document is stripped of invisible characters
+    and instruction-like phrases before any agent sees it."""
+    text, replaced = neutralize_injection(clean_untrusted_text(doc.raw_text))
+    warnings = list(doc.extraction_warnings)
+    if replaced:
+        warnings.append(f"Removed {replaced} instruction-like phrase(s) aimed at AI systems.")
+    return doc.model_copy(update={"raw_text": text, "extraction_warnings": warnings})
 
 
 def extract_pdf_text(path: str | Path) -> ExtractedDocument:
@@ -72,12 +83,14 @@ def extract_docx_text(path: str | Path) -> ExtractedDocument:
 def extract_plain_text(text: str, filename: str | None = None) -> ExtractedDocument:
     raw_text = text.strip()
     warnings = [] if raw_text else ["Empty text input."]
-    return ExtractedDocument(
-        source_format=SourceFormat.TEXT,
-        raw_text=raw_text,
-        page_count=1,
-        filename=filename,
-        extraction_warnings=warnings,
+    return _sanitize(
+        ExtractedDocument(
+            source_format=SourceFormat.TEXT,
+            raw_text=raw_text,
+            page_count=1,
+            filename=filename,
+            extraction_warnings=warnings,
+        )
     )
 
 
@@ -99,4 +112,4 @@ def extract_from_file(path: str | Path) -> ExtractedDocument:
         raise ValueError(
             f"Unsupported file extension '{ext}'. Supported: {sorted(EXTENSION_HANDLERS)}"
         )
-    return handler(path)
+    return _sanitize(handler(path))

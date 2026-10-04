@@ -30,10 +30,28 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.hr_jobs import create_batch_job, get_batch_job, run_batch_job
 from app.jobs import create_job, get_job, run_job
+from app.agents.resume_writer import generate_resume, score_resume
 from app.pipeline import run_pipeline
 from app.schemas.analysis import PipelineStatus
+from app.schemas.resume import ResumeProfile
+from app.security import SECURITY_HEADERS, RateLimiter, client_key
 
 app = FastAPI(title="Resume Intelligence Platform", version="0.1.0")
+
+# Per client IP, per minute. Anything that calls the LLM is tight; the ATS
+# re-score is deterministic and cheap, so it can be called on every edit.
+_analysis_limiter = RateLimiter(limit=6, window_seconds=60)
+_generate_limiter = RateLimiter(limit=4, window_seconds=60)
+_ats_limiter = RateLimiter(limit=60, window_seconds=60)
+# Backstop for every LLM-calling route, shared by all clients, so the Groq
+# quota is protected even if per-IP keys can be dodged.
+_llm_global_limiter = RateLimiter(limit=40, window_seconds=60)
+MAX_RESUME_JSON_BYTES = 100_000
+
+
+def _limit_llm(request: Request, per_client: RateLimiter) -> None:
+    per_client.check(client_key(request))
+    _llm_global_limiter.check("all")
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -66,6 +84,16 @@ async def require_shared_password(request: Request, call_next):
         status_code=401,
         headers={"WWW-Authenticate": 'Basic realm="Resume Intelligence Platform"'},
     )
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    # Registered after the password gate so it is the outermost layer and
+    # also covers that gate's 401 responses.
+    response = await call_next(request)
+    for name, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    return response
+
 
 ALLOWED_RESUME_EXTENSIONS = {".pdf", ".docx"}
 ALLOWED_JD_EXTENSIONS = {".pdf", ".docx", ".txt"}
@@ -164,10 +192,12 @@ def _validate_and_save_resumes(resume_files: list[UploadFile]) -> list[tuple[str
 
 @app.post("/analysis")
 async def create_analysis(
+    request: Request,
     resume_file: UploadFile = File(...),
     jd_text: str | None = Form(default=None),
     jd_file: UploadFile | None = File(default=None),
 ):
+    _limit_llm(request, _analysis_limiter)
     resume_path, jd_path, jd_text = _validate_and_save_inputs(resume_file, jd_text, jd_file)
     try:
         if jd_path is not None:
@@ -198,10 +228,12 @@ async def create_analysis(
 
 @app.post("/analysis/start")
 async def start_analysis(
+    request: Request,
     resume_file: UploadFile = File(...),
     jd_text: str | None = Form(default=None),
     jd_file: UploadFile | None = File(default=None),
 ):
+    _limit_llm(request, _analysis_limiter)
     resume_path, jd_path, jd_text = _validate_and_save_inputs(resume_file, jd_text, jd_file)
     job = create_job()
 
@@ -228,8 +260,54 @@ def get_analysis_status(job_id: str):
     return job.to_dict()
 
 
+def _completed_result(job_id: str):
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="No job with that id (it may have expired).")
+    with job.lock:
+        outcome = job.outcome if job.status == "completed" else None
+    if outcome is None or outcome.result is None:
+        raise HTTPException(status_code=409, detail="That analysis has not completed.")
+    return outcome.result
+
+
+@app.post("/analysis/{job_id}/resume")
+def generate_improved_resume(job_id: str, request: Request):
+    """Rewrites the analyzed resume for the analyzed job. The server uses its
+    own stored analysis, never client-supplied resume text, so this can't be
+    used to push arbitrary content at the LLM."""
+    _limit_llm(request, _generate_limiter)
+    result = _completed_result(job_id)
+    resume = generate_resume(result.resume_profile, result.job_profile, result.gaps)
+    return {
+        "resume": resume.model_dump(),
+        "ats": score_resume(resume, result.job_profile).model_dump(),
+        # Scored the same way as "ats", so the before/after comparison is fair.
+        "baseline_ats": score_resume(result.resume_profile, result.job_profile).model_dump(),
+    }
+
+
+@app.post("/analysis/{job_id}/ats")
+async def score_edited_resume(job_id: str, request: Request):
+    """Deterministic ATS score for an edited resume. No LLM call."""
+    _ats_limiter.check(client_key(request))
+    result = _completed_result(job_id)
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_RESUME_JSON_BYTES:
+        raise HTTPException(status_code=413, detail="Resume data is too large.")
+    body = await request.body()
+    if len(body) > MAX_RESUME_JSON_BYTES:
+        raise HTTPException(status_code=413, detail="Resume data is too large.")
+    try:
+        resume = ResumeProfile.model_validate_json(body)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid resume data.")
+    return {"ats": score_resume(resume, result.job_profile).model_dump()}
+
+
 @app.post("/hr/batch-analysis/start")
 async def start_batch_analysis(
+    request: Request,
     resume_files: list[UploadFile] = File(...),
     jd_text: str | None = Form(default=None),
     jd_file: UploadFile | None = File(default=None),
@@ -237,6 +315,7 @@ async def start_batch_analysis(
     """HR mode: one JD scored against many resumes, ranked for screening.
     Distinct from /analysis/start (candidate mode) — see app/hr_pipeline.py
     for why this isn't just a loop over the candidate pipeline."""
+    _limit_llm(request, _analysis_limiter)
     jd_path, jd_text = _validate_and_save_jd(jd_text, jd_file)
     try:
         resumes = _validate_and_save_resumes(resume_files)

@@ -189,6 +189,8 @@
     .btn, .mode-btn, .tab-btn { transition: none; }
   }
 </style>
+<link rel="stylesheet" href="/builder.css" />
+<link rel="icon" href="data:," />
 </head>
 <body>
 <div class="wrap">
@@ -264,10 +266,13 @@
   </div>
 
   <div id="resultsWrap" style="margin-top: 28px;"></div>
+  <div id="builderRoot"></div>
 </div>
 
+<script src="/builder.js"></script>
 <script>
-const CANDIDATE_TAGLINE = 'Upload a resume and a job description to get an explainable match score, gap analysis, and recommendations.';
+let currentJobId = null;
+const CANDIDATE_TAGLINE ='Upload a resume and a job description to get an explainable match score, gap analysis, and recommendations.';
 const HR_TAGLINE = 'Upload a job description and multiple resumes to get a ranked, explainable comparison for screening.';
 
 document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -279,6 +284,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     document.getElementById('hrMode').style.display = isHr ? 'block' : 'none';
     document.getElementById('modeTagline').textContent = isHr ? HR_TAGLINE : CANDIDATE_TAGLINE;
     document.getElementById('resultsWrap').innerHTML = '';
+    ResumeBuilder.clear();
     document.getElementById('stepsCard').style.display = 'none';
     document.getElementById('status').textContent = '';
   });
@@ -487,6 +493,19 @@ function renderResults(result, metrics) {
     recCard.appendChild(row);
   });
   wrap.appendChild(recCard);
+
+  const buildCard = el('div', { class: 'card' });
+  buildCard.appendChild(el('h2', { text: 'Build an improved resume' }));
+  buildCard.appendChild(el('p', {
+    text: 'Rewrite your resume for this job using only what is already in it, pick a template, edit anything, and watch the ATS score update.',
+    style: 'color:var(--text-muted);font-size:14px;margin:0 0 14px;',
+  }));
+  const buildBtn = el('button', { class: 'btn', type: 'button', text: 'Build my resume' });
+  const buildStatus = el('div', { style: 'margin-top:12px;font-size:14px;color:var(--text-muted);' });
+  buildBtn.addEventListener('click', () => ResumeBuilder.start(currentJobId, result.ats_analysis.score, buildBtn, buildStatus));
+  buildCard.appendChild(buildBtn);
+  buildCard.appendChild(buildStatus);
+  wrap.appendChild(buildCard);
 }
 
 function renderBanner(className, text) {
@@ -537,6 +556,8 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
 
   btn.disabled = true;
   status.textContent = 'Starting analysis...';
+  currentJobId = null;
+  ResumeBuilder.clear();
   document.getElementById('resultsWrap').innerHTML = '';
   document.getElementById('stepsCard').style.display = 'none';
 
@@ -550,6 +571,7 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
     }
 
     status.textContent = '';
+    currentJobId = startData.job_id;
     const outcome = await pollJob(startData.job_id);
 
     if (outcome.kind === 'rejected') {

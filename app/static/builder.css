@@ -1,0 +1,101 @@
+/* Resume builder: editor, preview sheet, three templates, print rules. */
+
+.r-muted { color: var(--text-muted); font-size: 13px; }
+
+/* The page column is 960px; the editor plus a readable resume needs more. */
+@media (min-width: 1100px) {
+  #builderRoot { position: relative; left: 50%; transform: translateX(-50%); width: min(1240px, calc(100vw - 48px)); }
+}
+
+.rb-shell { padding: 28px; }
+.rb-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.rb-toolbar label { margin: 0; }
+.rb-toolbar select {
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-control);
+  font: inherit; background: var(--surface); color: var(--text);
+}
+
+.rb-ats {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 16px 0; margin-bottom: 16px;
+}
+.rb-ats-score { font-size: 40px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+.rb-ats-issues { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-muted); flex-basis: 100%; }
+.rb-todo-note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: var(--radius-control); padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+
+.rb-cols { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 24px; align-items: start; }
+@media (max-width: 960px) { .rb-cols { grid-template-columns: 1fr; } }
+
+.rb-editor { max-height: 80vh; overflow-y: auto; padding-right: 6px; }
+.rb-group { border: none; border-top: 1px solid var(--border); margin: 0 0 8px; padding: 14px 0 6px; min-width: 0; }
+.rb-group legend { font-weight: 600; font-size: 14px; padding: 0 8px 0 0; }
+.rb-field { margin-bottom: 10px; }
+.rb-field label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.rb-field input, .rb-field textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-control);
+  font: inherit; font-size: 13px; background: var(--surface); color: var(--text);
+}
+.rb-check { display: flex; align-items: center; gap: 8px; }
+.rb-check input { width: auto; }
+.rb-check label { margin: 0; }
+.rb-entry { border-left: 2px solid var(--border); padding-left: 12px; margin-bottom: 14px; }
+.rb-add, .rb-link {
+  background: none; border: none; padding: 4px 0; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--primary); cursor: pointer;
+}
+.rb-link { color: var(--text-muted); font-weight: 500; }
+
+.rb-preview { overflow-x: auto; }
+
+/* ---- resume sheet (shared) ---- */
+.sheet {
+  background: #fff; color: #1b1f24; max-width: 794px; margin: 0 auto; padding: 40px 44px;
+  border: 1px solid var(--border); font-size: 12.5px; line-height: 1.5;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+.sheet .r-name { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.sheet .r-contact { color: #4a5360; margin-top: 4px; overflow-wrap: anywhere; }
+.sheet .r-section { margin-top: 16px; }
+.sheet h3 { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px; padding-bottom: 3px; border-bottom: 1px solid #1b1f24; }
+.sheet p { margin: 0 0 4px; }
+.sheet .r-item { margin-bottom: 10px; }
+.sheet .r-item-head { display: flex; justify-content: space-between; gap: 12px; }
+.sheet .r-dates { color: #4a5360; white-space: nowrap; }
+.sheet .r-bullets { margin: 3px 0 0; padding-left: 18px; }
+.sheet .r-bullets li { margin-bottom: 2px; }
+.sheet .r-muted { color: #4a5360; font-size: 12px; }
+.sheet .r-todo { background: #fde68a; color: #7c2d12; padding: 0 3px; border-radius: 3px; }
+.sheet .r-aside, .sheet .r-main { min-width: 0; }
+
+/* ---- Classic: one column, plain, safest for ATS parsers ---- */
+.tpl-classic .r-body { display: block; }
+
+/* ---- Modern: accent name, side column for skills/education ---- */
+.tpl-modern .r-name { color: var(--primary-dark); font-size: 30px; }
+.tpl-modern h3 { border-bottom: none; border-left: 3px solid var(--primary); padding: 0 0 0 8px; color: var(--primary-dark); }
+.tpl-modern .r-body { display: grid; grid-template-columns: 1fr 210px; gap: 28px; }
+@media (max-width: 640px) { .tpl-modern .r-body { display: block; } }
+
+/* ---- Compact: smaller type, tighter rhythm, for long resumes ---- */
+.tpl-compact { font-size: 11px; line-height: 1.4; padding: 28px 32px; }
+.tpl-compact .r-name { font-size: 22px; }
+.tpl-compact .r-section { margin-top: 10px; }
+.tpl-compact .r-item { margin-bottom: 6px; }
+.tpl-compact .r-body { display: block; }
+.tpl-compact .r-aside { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+@media (max-width: 640px) { .tpl-compact .r-aside { display: block; } }
+
+/* ---- Print: only the sheet ---- */
+@page { margin: 12mm; }
+@media print {
+  #builderRoot { left: 0; transform: none; width: auto; }
+  .wrap > *:not(#builderRoot) { display: none !important; }
+  #builderRoot .rb-shell { border: none; padding: 0; margin: 0; }
+  #builderRoot .rb-shell > *:not(.rb-cols),
+  #builderRoot .rb-editor { display: none !important; }
+  .rb-cols { display: block; }
+  .sheet { border: none; padding: 0; max-width: none; }
+  .sheet .r-todo { background: none; color: inherit; }
+  body { background: #fff; }
+}
