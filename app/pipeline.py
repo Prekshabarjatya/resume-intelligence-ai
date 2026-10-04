@@ -52,7 +52,7 @@ def _outcome_from_state(final_state: AgentState, metrics: RunMetrics | None = No
     if metrics is not None and final_state.gaps:
         metrics.gaps_identified = len(final_state.gaps)
     if metrics is not None and final_state.skill_matches:
-        metrics.skills_matched = len(final_state.skill_matches.matches)
+        metrics.skills_matched = sum(1 for m in final_state.skill_matches if m.match_type != "none")
 
     result = AnalysisResult(
         resume_classification=final_state.resume_classification,
