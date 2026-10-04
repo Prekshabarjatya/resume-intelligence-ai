@@ -78,8 +78,10 @@ class JobRecord:
             payload["error"] = error
         elif status == "rejected" and outcome is not None:
             payload["reason"] = outcome.rejection_reason
+            payload["metrics"] = outcome.metrics.to_dict() if outcome.metrics else None
         elif status == "completed" and outcome is not None:
             payload["result"] = outcome.result.model_dump()
+            payload["metrics"] = outcome.metrics.to_dict() if outcome.metrics else None
         return payload
 
 

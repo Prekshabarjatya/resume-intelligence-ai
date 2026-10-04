@@ -182,10 +182,18 @@ async def create_analysis(
     if outcome.status in (PipelineStatus.REJECTED_RESUME, PipelineStatus.REJECTED_JD):
         return JSONResponse(
             status_code=422,
-            content={"status": outcome.status.value, "reason": outcome.rejection_reason},
+            content={
+                "status": outcome.status.value,
+                "reason": outcome.rejection_reason,
+                "metrics": outcome.metrics.to_dict() if outcome.metrics else None,
+            },
         )
 
-    return {"status": outcome.status.value, "result": outcome.result.model_dump()}
+    return {
+        "status": outcome.status.value,
+        "result": outcome.result.model_dump(),
+        "metrics": outcome.metrics.to_dict() if outcome.metrics else None,
+    }
 
 
 @app.post("/analysis/start")
