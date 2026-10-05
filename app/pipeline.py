@@ -4,8 +4,12 @@ the synchronous API endpoint, and the async job runner so none of them can
 drift apart.
 """
 
+import logging
+import time
 from dataclasses import dataclass
 from typing import Callable
+
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 
 from app.graph import get_compiled_graph
 from app.ingestion.extract import extract_from_file, extract_plain_text
@@ -13,6 +17,8 @@ from app.metrics import RunMetrics
 from app.schemas.analysis import AgentState, AnalysisResult, PipelineStatus
 
 OnStepCallback = Callable[[str, AgentState], None]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -85,13 +91,19 @@ def run_pipeline_with_progress(
 
         graph = get_compiled_graph()
         accumulated = initial_state.model_dump()
-        for update in graph.stream(initial_state, stream_mode="updates"):
+        usage = UsageMetadataCallbackHandler()
+        step_started = time.monotonic()
+        for update in graph.stream(initial_state, stream_mode="updates", config={"callbacks": [usage]}):
             for node_name, partial in update.items():
+                logger.info("pipeline step %s finished in %.1fs", node_name, time.monotonic() - step_started)
+                step_started = time.monotonic()
                 accumulated.update(partial)
                 if on_step is not None:
                     on_step(node_name, AgentState.model_validate(accumulated))
 
         final_state = AgentState.model_validate(accumulated)
+        metrics.tokens_used = sum(u.get("total_tokens", 0) for u in usage.usage_metadata.values())
+        logger.info("pipeline finished: %s tokens", metrics.tokens_used)
         return _outcome_from_state(final_state, metrics)
     finally:
         metrics.finish()

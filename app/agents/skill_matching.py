@@ -16,7 +16,8 @@ from app.config import settings
 from app.schemas.analysis import MatchType, SkillMatch
 from app.schemas.base import LLMSchema
 from app.schemas.job import SkillRequirement
-from app.tools.llm import get_classifier_llm
+from app.security import UNTRUSTED_NOTE, fence
+from app.tools.llm import get_reasoning_llm, structured
 
 _SYSTEM_PROMPT = """You judge whether a job's required/preferred skill is
 genuinely satisfied by any skill the candidate has actually listed.
@@ -31,11 +32,16 @@ AWS and Python are NOT a match; React and Vue are NOT a match).
 If nothing in the candidate's list is a genuine equivalent, set
 matched_resume_skill to null and is_match to false. Only ever choose
 matched_resume_skill from the exact strings given in the candidate's skill
-list — never invent a skill."""
+list — never invent a skill.
+
+Return exactly one judgment per numbered target skill, setting index to that
+target's number.
+
+""" + UNTRUSTED_NOTE
 
 
 class SkillMatchJudgment(LLMSchema):
-    required_skill: str
+    index: int = Field(description="The number of the target skill this judgment is for (1-based).")
     matched_resume_skill: str | None
     is_match: bool
     confidence: float = Field(ge=0.0, le=1.0)
@@ -53,24 +59,25 @@ def judge_semantic_skill_matches(
         return SkillMatchJudgmentList(
             judgments=[
                 SkillMatchJudgment(
-                    required_skill=s,
+                    index=i,
                     matched_resume_skill=None,
                     is_match=False,
                     confidence=0.0,
                     reasoning="Candidate has no listed skills to compare against.",
                 )
-                for s in unmatched_required_skills
+                for i, _ in enumerate(unmatched_required_skills, start=1)
             ]
         )
 
-    llm = get_classifier_llm().with_structured_output(SkillMatchJudgmentList)
+    numbered = "\n".join(f"{i}. {s}" for i, s in enumerate(unmatched_required_skills, start=1))
+    llm = structured(get_reasoning_llm(), SkillMatchJudgmentList)
     return llm.invoke(
         [
             ("system", _SYSTEM_PROMPT),
             (
                 "human",
-                f"TARGET SKILLS TO CHECK:\n{unmatched_required_skills}\n\n"
-                f"CANDIDATE'S ACTUAL LISTED SKILLS:\n{resume_skills}",
+                f"TARGET SKILLS TO CHECK:\n{fence('job_data', numbered)}\n\n"
+                f"CANDIDATE'S ACTUAL LISTED SKILLS:\n{fence('resume_data', chr(10).join(resume_skills))}",
             ),
         ]
     )
@@ -91,11 +98,13 @@ def resolve_unmatched_skills(
     judgment_list = judge_semantic_skill_matches(
         [r.skill for r in unmatched_requirements], resume_skills
     )
-    judgments_by_skill = {j.required_skill: j for j in judgment_list.judgments}
+    # Matched by the number we gave each target, not by the skill text the
+    # model echoes back: a reworded echo would otherwise silently become "no match".
+    judgments_by_index = {j.index: j for j in judgment_list.judgments}
 
     results: list[SkillMatch] = []
-    for req in unmatched_requirements:
-        judgment = judgments_by_skill.get(req.skill)
+    for i, req in enumerate(unmatched_requirements, start=1):
+        judgment = judgments_by_index.get(i)
         accepted = (
             judgment is not None
             and judgment.is_match

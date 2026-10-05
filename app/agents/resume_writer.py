@@ -19,8 +19,8 @@ from app.schemas.base import LLMSchema
 from app.schemas.job import JobProfile
 from app.schemas.resume import PersonalInfo, ResumeProfile
 from app.security import clean_untrusted_text
-from app.tools.llm import get_reasoning_llm
-from app.tools.scoring import _normalize, analyze_ats, keyword_coverage_score
+from app.tools.llm import get_reasoning_llm, structured
+from app.tools.scoring import _contains_phrase, _normalize, analyze_ats, keyword_coverage_score
 
 _SYSTEM_PROMPT = """You rewrite resumes for a specific target role.
 
@@ -101,12 +101,6 @@ def profile_to_text(profile: ResumeProfile) -> str:
     return "\n".join(lines)
 
 
-def _mentions(norm_source: str, norm_skill: str) -> bool:
-    """Whole-token match, so "java" is not found inside "javascript" and "go"
-    is not found inside "google"."""
-    return re.search(rf"(?<![a-z0-9+.#]){re.escape(norm_skill)}(?![a-z0-9+.#])", norm_source) is not None
-
-
 def score_resume(resume: ResumeProfile, job: JobProfile) -> ATSAnalysis:
     """Same deterministic ATS scoring the analysis uses, applied to any
     (possibly user-edited) profile."""
@@ -141,7 +135,7 @@ def merge_rewrite(original: ResumeProfile, rewrite: RewrittenResume) -> ResumePr
         key = _normalize(s)
         if not key or key in seen:
             continue
-        if s in original_skills or _mentions(norm_source, key):
+        if s in original_skills or _contains_phrase(norm_source, key):
             seen.add(key)
             skills.append(s)
 
@@ -186,7 +180,7 @@ def generate_resume(original: ResumeProfile, job: JobProfile, gaps: list[GapItem
             indent=2,
         )
     )
-    llm = get_reasoning_llm().with_structured_output(RewrittenResume)
+    llm = structured(get_reasoning_llm(), RewrittenResume)
     rewrite = llm.invoke(
         [
             ("system", _SYSTEM_PROMPT),

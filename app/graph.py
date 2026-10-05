@@ -35,7 +35,7 @@ JD_CONFIDENCE_THRESHOLD = 0.6
 def node_validate_resume(state: AgentState) -> dict:
     classification = classify_resume(state.resume_document.raw_text)
     is_valid = (
-        classification.document_type == "resume" and classification.confidence >= RESUME_CONFIDENCE_THRESHOLD
+        classification.is_resume() and classification.confidence >= RESUME_CONFIDENCE_THRESHOLD
     )
     return {
         "resume_classification": classification,
@@ -50,7 +50,7 @@ def route_after_resume_validation(state: AgentState) -> str:
 def node_validate_jd(state: AgentState) -> dict:
     classification = classify_job_description(state.jd_document.raw_text)
     is_valid = (
-        classification.document_type == "job_description"
+        classification.is_job_description()
         and classification.confidence >= JD_CONFIDENCE_THRESHOLD
     )
     return {

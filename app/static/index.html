@@ -56,7 +56,7 @@
   .card h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 16px; color: var(--text); }
 
   .run-metrics {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0;
     border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
     margin-bottom: 20px;
   }
@@ -357,6 +357,7 @@ function renderMetrics(metrics) {
     [`${metrics.runtime_seconds}s`, 'Analysis time'],
     [String(metrics.skills_matched), 'Skills matched'],
     [String(metrics.gaps_identified), 'Gaps found'],
+    ...(metrics.tokens_used ? [[metrics.tokens_used.toLocaleString(), 'Tokens used']] : []),
   ].forEach(([val, key]) => {
     strip.appendChild(el('div', {}, [
       el('div', { class: 'val', text: val }),

@@ -129,7 +129,7 @@ def test_run_job_rejection_stops_partway_through_steps(monkeypatch):
     assert steps_by_name["validate_jd"] == "pending"
 
 
-def test_run_job_failure_is_captured_not_raised(monkeypatch):
+def test_run_job_failure_is_captured_not_raised(monkeypatch, caplog):
     def boom(path):
         raise RuntimeError("disk exploded")
 
@@ -140,4 +140,19 @@ def test_run_job_failure_is_captured_not_raised(monkeypatch):
 
     view = job.to_dict()
     assert view["status"] == "failed"
-    assert "disk exploded" in view["error"]
+    # The client gets a clean message; the raw exception stays in the server log.
+    assert "disk exploded" not in view["error"]
+    assert "could not be completed" in view["error"]
+    assert "disk exploded" in caplog.text
+
+
+def test_run_job_rate_limit_failure_gets_a_friendly_message(monkeypatch):
+    def boom(path):
+        raise RuntimeError("Error code: 429 - rate limit reached for model")
+
+    monkeypatch.setattr(pipeline_module, "extract_from_file", boom)
+
+    job = create_job()
+    run_job(job, "unused-resume-path.pdf", VALID_JD_TEXT, jd_is_file=False)
+
+    assert "busy" in job.to_dict()["error"]

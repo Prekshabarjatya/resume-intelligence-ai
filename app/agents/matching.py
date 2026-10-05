@@ -12,7 +12,8 @@ untrusted document).
 from app.schemas.analysis import QualitativeMatch
 from app.schemas.job import JobProfile
 from app.schemas.resume import ResumeProfile
-from app.tools.llm import get_reasoning_llm
+from app.security import UNTRUSTED_NOTE, fence
+from app.tools.llm import get_reasoning_llm, structured
 
 _SYSTEM_PROMPT = """You are assessing candidate fit for a role based on two
 structured profiles (already extracted from a resume and a job description).
@@ -25,20 +26,18 @@ Score qualification_match (0-100): how well the candidate's education,
 certifications, and stated qualifications meet the role's qualifications.
 
 Give a one-to-two sentence reasoning for each score, citing specific items
-from the profiles."""
+from the profiles.""" + "\n\n" + UNTRUSTED_NOTE
 
 
 def assess_qualitative_match(resume: ResumeProfile, job: JobProfile) -> QualitativeMatch:
-    llm = get_reasoning_llm().with_structured_output(QualitativeMatch)
+    llm = structured(get_reasoning_llm(), QualitativeMatch)
     return llm.invoke(
         [
             ("system", _SYSTEM_PROMPT),
             (
                 "human",
-                "CANDIDATE PROFILE (JSON):\n"
-                f"{resume.model_dump_json(indent=2)}\n\n"
-                "JOB PROFILE (JSON):\n"
-                f"{job.model_dump_json(indent=2)}",
+                f"{fence('resume_data', resume.to_prompt_json())}\n\n"
+                f"{fence('job_data', job.model_dump_json(indent=2))}",
             ),
         ]
     )

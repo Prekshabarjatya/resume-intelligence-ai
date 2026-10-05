@@ -53,7 +53,7 @@ def score_one_candidate(filename: str, resume_path: str, job_profile: JobProfile
     resume_document = extract_from_file(resume_path)
     classification = classify_resume(resume_document.raw_text)
     is_valid = (
-        classification.document_type == "resume" and classification.confidence >= RESUME_CONFIDENCE_THRESHOLD
+        classification.is_resume() and classification.confidence >= RESUME_CONFIDENCE_THRESHOLD
     )
     if not is_valid:
         return CandidateResult(
@@ -118,7 +118,7 @@ def run_batch_pipeline(
     step("validate_jd")
 
     is_jd_valid = (
-        jd_classification.document_type == "job_description"
+        jd_classification.is_job_description()
         and jd_classification.confidence >= JD_CONFIDENCE_THRESHOLD
     )
     if not is_jd_valid:

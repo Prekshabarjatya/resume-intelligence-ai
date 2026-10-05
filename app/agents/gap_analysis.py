@@ -9,7 +9,8 @@ to surface it.
 from app.schemas.analysis import GapList, MatchType, QualitativeMatch, SkillMatch
 from app.schemas.job import JobProfile
 from app.schemas.resume import ResumeProfile
-from app.tools.llm import get_reasoning_llm
+from app.security import UNTRUSTED_NOTE, fence
+from app.tools.llm import get_reasoning_llm, structured
 
 _SYSTEM_PROMPT = """You are a gap analysis agent for a resume/job-fit tool.
 Given the candidate profile, job profile, computed skill matches, and a
@@ -23,7 +24,9 @@ Rules:
   "If you genuinely have experience with X, add it — do not fabricate it."
 - Never recommend inventing companies, dates, metrics, or credentials.
 - Keep each gap description to one sentence and each recommendation to one
-  actionable sentence."""
+  actionable sentence.
+
+""" + UNTRUSTED_NOTE
 
 
 def analyze_gaps(
@@ -35,16 +38,14 @@ def analyze_gaps(
     missing = [m for m in skill_matches if m.match_type == MatchType.NONE]
     weak = [m for m in skill_matches if m.match_type == MatchType.SEMANTIC and m.similarity < 0.75]
 
-    llm = get_reasoning_llm().with_structured_output(GapList)
+    llm = structured(get_reasoning_llm(), GapList)
     return llm.invoke(
         [
             ("system", _SYSTEM_PROMPT),
             (
                 "human",
-                "CANDIDATE PROFILE (JSON):\n"
-                f"{resume.model_dump_json(indent=2)}\n\n"
-                "JOB PROFILE (JSON):\n"
-                f"{job.model_dump_json(indent=2)}\n\n"
+                f"{fence('resume_data', resume.to_prompt_json())}\n\n"
+                f"{fence('job_data', job.model_dump_json(indent=2))}\n\n"
                 "MISSING SKILLS:\n"
                 f"{[m.required_skill for m in missing]}\n\n"
                 "WEAKLY-MATCHED SKILLS (semantic, low confidence):\n"

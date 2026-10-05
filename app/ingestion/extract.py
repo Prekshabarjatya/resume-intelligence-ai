@@ -15,6 +15,28 @@ from app.schemas.document import ExtractedDocument, SourceFormat
 from app.security import clean_untrusted_text, neutralize_injection
 
 MIN_CHARS_PER_PAGE_WARNING = 20
+MIN_VISIBLE_FONT_PT = 2.0
+WHITE_RGB = 0xFFFFFF
+
+
+def _hidden_text(doc) -> tuple[list[str], int]:
+    """Returns (spans smaller than anyone can read, number of characters of
+    pure-white text). Both are the usual ways to stuff keywords into a resume
+    for software while a person sees nothing."""
+    tiny: list[str] = []
+    white_chars = 0
+    for page in doc:
+        for block in page.get_text("dict").get("blocks", []):
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    text = span.get("text", "")
+                    if not text.strip():
+                        continue
+                    if span.get("size", 12) < MIN_VISIBLE_FONT_PT:
+                        tiny.append(text)
+                    elif span.get("color") == WHITE_RGB:
+                        white_chars += len(text)
+    return tiny, white_chars
 
 
 def _sanitize(doc: ExtractedDocument) -> ExtractedDocument:
@@ -33,10 +55,24 @@ def extract_pdf_text(path: str | Path) -> ExtractedDocument:
     try:
         page_texts = [page.get_text() for page in doc]
         page_count = doc.page_count
+        tiny_spans, white_chars = _hidden_text(doc)
     finally:
         doc.close()
 
     raw_text = "\n".join(page_texts).strip()
+    if tiny_spans:
+        for span_text in tiny_spans:
+            raw_text = raw_text.replace(span_text, "")
+        raw_text = raw_text.strip()
+        warnings.append(
+            f"Removed {sum(len(s) for s in tiny_spans)} characters of microscopic text "
+            f"(under {MIN_VISIBLE_FONT_PT}pt) that a person cannot read but software can."
+        )
+    if white_chars:
+        warnings.append(
+            f"Found {white_chars} characters of white text. It was kept because white text "
+            "can be legitimate (for example on a coloured header), but it may be hidden keywords."
+        )
     avg_chars = len(raw_text) / max(page_count, 1)
     if avg_chars < MIN_CHARS_PER_PAGE_WARNING:
         warnings.append(

@@ -16,7 +16,20 @@ from app.schemas.resume import ResumeProfile
 
 
 def _normalize(text: str) -> str:
-    return re.sub(r"[^a-z0-9+.# ]", "", text.lower()).strip()
+    """Lowercases and reduces text to words. Anything that isn't a letter,
+    digit, '+', '.', '#' or space becomes a space (so newlines and hyphens
+    separate words instead of gluing them together)."""
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9+.# ]", " ", text.lower())).strip()
+
+
+def _contains_phrase(haystack: str, needle: str) -> bool:
+    """Whole-word containment on normalized text. "java" is not found in
+    "javascript", "go" not in "google", "c" not in "c++" or "docker"; a
+    sentence-ending period after the phrase is allowed ("... using python.")."""
+    if not needle:
+        return False
+    pattern = rf"(?<![a-z0-9+.#]){re.escape(needle)}(?![a-z0-9+#])(?!\.[a-z0-9])"
+    return re.search(pattern, haystack) is not None
 
 
 def _exact_match_one(requirement: SkillRequirement, resume_skills: list[str]) -> SkillMatch | None:
@@ -38,7 +51,7 @@ def _exact_match_one(requirement: SkillRequirement, resume_skills: list[str]) ->
         )
 
     for norm_skill, original in normalized_resume.items():
-        if norm_skill and (norm_req in norm_skill or norm_skill in norm_req):
+        if norm_skill and (_contains_phrase(norm_skill, norm_req) or _contains_phrase(norm_req, norm_skill)):
             return SkillMatch(
                 required_skill=requirement.skill,
                 importance=requirement.importance.value,
@@ -88,10 +101,11 @@ def skill_match_score(skill_matches: list[SkillMatch]) -> float:
 
 
 def keyword_coverage_score(resume_text: str, keywords: list[str]) -> float:
+    keywords = [kw for kw in keywords if _normalize(kw)]
     if not keywords:
         return 100.0
     normalized_resume = _normalize(resume_text)
-    hits = sum(1 for kw in keywords if _normalize(kw) in normalized_resume)
+    hits = sum(1 for kw in keywords if _contains_phrase(normalized_resume, _normalize(kw)))
     return round(100 * hits / len(keywords), 1)
 
 

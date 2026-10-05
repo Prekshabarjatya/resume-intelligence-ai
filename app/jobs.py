@@ -10,6 +10,7 @@ worth of jobs living in a dict is a fine trade-off for a local dev tool;
 it does not survive a server restart and does not scale past one process.
 """
 
+import logging
 import threading
 import time
 import uuid
@@ -17,6 +18,20 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from app.pipeline import PipelineOutcome, run_pipeline_with_progress
+
+logger = logging.getLogger(__name__)
+
+
+def _public_error(exc: Exception) -> str:
+    text = str(exc).lower()
+    if "rate limit" in text or "429" in text or "too many requests" in text:
+        return "The AI service is busy right now. Please try again in a minute."
+    if isinstance(exc, ValueError):
+        return str(exc)
+    return (
+        "The analysis could not be completed. Check that the files are valid, "
+        "unprotected PDF or DOCX documents, then try again."
+    )
 
 # Node name -> human-readable label, in pipeline order. Used both to render
 # steps that haven't run yet ("pending") and to label ones that have.
@@ -133,6 +148,10 @@ def run_job(job: JobRecord, resume_path: str, jd: str, jd_is_file: bool) -> None
             else:
                 job.status = "completed"
     except Exception as exc:  # noqa: BLE001 - reported to the client, not swallowed silently
+        # Full detail goes to the server log (never document text); the client
+        # gets a short message, since raw provider/library errors can be
+        # confusing and can expose internals.
+        logger.exception("analysis job %s failed", job.id)
         with job.lock:
             job.status = "failed"
-            job.error = str(exc)
+            job.error = _public_error(exc)

@@ -52,3 +52,15 @@ class ResumeProfile(LLMSchema):
     total_years_experience: float | None = Field(
         default=None, description="Deterministically computed from experience dates, not LLM-estimated."
     )
+
+    def to_prompt_json(self) -> str:
+        """JSON for downstream prompts. Drops the verbatim source excerpts:
+        they only repeat the resume text (more tokens) and re-inject raw
+        document content into every later prompt."""
+        return self.model_dump_json(
+            indent=2,
+            exclude={
+                "experience": {"__all__": {"source_evidence"}},
+                "projects": {"__all__": {"source_evidence"}},
+            },
+        )

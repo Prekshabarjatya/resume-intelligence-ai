@@ -17,6 +17,7 @@ Redis + a proper worker without touching the graph itself.
 """
 
 import base64
+import logging
 import secrets
 import shutil
 import tempfile
@@ -35,6 +36,8 @@ from app.pipeline import run_pipeline
 from app.schemas.analysis import PipelineStatus
 from app.schemas.resume import ResumeProfile
 from app.security import SECURITY_HEADERS, RateLimiter, client_key
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = FastAPI(title="Resume Intelligence Platform", version="0.1.0")
 

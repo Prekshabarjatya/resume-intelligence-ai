@@ -10,6 +10,7 @@ class RunMetrics:
     end_time: float | None = None
     gaps_identified: int = 0
     skills_matched: int = 0
+    tokens_used: int = 0
 
     @property
     def runtime_seconds(self) -> float:
@@ -23,4 +24,5 @@ class RunMetrics:
             "runtime_seconds": round(self.runtime_seconds, 2),
             "gaps_identified": self.gaps_identified,
             "skills_matched": self.skills_matched,
+            "tokens_used": self.tokens_used,
         }
